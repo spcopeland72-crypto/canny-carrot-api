@@ -32,16 +32,23 @@ router.use(async (req, res, next) => {
  */
 router.post('/:command', async (req, res) => {
   const { command } = req.params;
+  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     const { args = [] } = req.body;
 
     // Log all Redis requests for debugging
-    logger.redis.info(`Redis command received: ${command}`, {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      requestId,
+      step: 'REDIS_COMMAND_RECEIVED',
       command,
       key: args[0],
       argsCount: args.length,
-      args: args.length > 2 ? args.slice(0, 2) : args, // Log first 2 args to avoid huge payloads
-    });
+      args: args.length > 2 ? args.slice(0, 2) : args,
+    };
+    logger.redis.info(`Redis command received: ${command}`, logEntry);
+    console.log('📝 [REDIS-API-LOG]', JSON.stringify(logEntry));
 
     // Security: Only allow safe Redis commands
     const allowedCommands = [
@@ -151,7 +158,16 @@ router.post('/:command', async (req, res) => {
     // Execute command
     let result;
     const startTime = Date.now();
+    const commandKey = args[0] || 'N/A';
+    
     try {
+      logger.redis.info(`Executing Redis command: ${command}`, {
+        command,
+        key: commandKey,
+        argsCount: args.length,
+        timestamp: new Date().toISOString(),
+      });
+      
       if (args.length === 0) {
         result = await (redisClient as any)[command]();
       } else if (args.length === 1) {
