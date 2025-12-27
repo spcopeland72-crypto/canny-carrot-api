@@ -17,8 +17,8 @@ const router = express.Router();
  * Body: { args: any[] }
  */
 router.post('/:command', async (req, res) => {
+  const { command } = req.params;
   try {
-    const { command } = req.params;
     const { args = [] } = req.body;
 
     // Log all Redis requests for debugging
