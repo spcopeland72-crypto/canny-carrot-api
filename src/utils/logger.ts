@@ -6,14 +6,24 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LOGS_DIR = path.join(process.cwd(), 'logs');
-const REGISTRATION_LOG_FILE = path.join(LOGS_DIR, 'registration.log');
-const REDIS_LOG_FILE = path.join(LOGS_DIR, 'redis-operations.log');
-const ERROR_LOG_FILE = path.join(LOGS_DIR, 'errors.log');
+// Detect if we're running on Vercel (read-only filesystem)
+const IS_VERCEL = process.env.VERCEL === '1';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const ENABLE_FILE_LOGGING = !IS_VERCEL && !IS_PRODUCTION;
 
-// Ensure logs directory exists
-if (!fs.existsSync(LOGS_DIR)) {
-  fs.mkdirSync(LOGS_DIR, { recursive: true });
+const LOGS_DIR = ENABLE_FILE_LOGGING ? path.join(process.cwd(), 'logs') : '';
+const REGISTRATION_LOG_FILE = ENABLE_FILE_LOGGING ? path.join(LOGS_DIR, 'registration.log') : '';
+const REDIS_LOG_FILE = ENABLE_FILE_LOGGING ? path.join(LOGS_DIR, 'redis-operations.log') : '';
+const ERROR_LOG_FILE = ENABLE_FILE_LOGGING ? path.join(LOGS_DIR, 'errors.log') : '';
+
+// Ensure logs directory exists (only in development)
+if (ENABLE_FILE_LOGGING && LOGS_DIR && !fs.existsSync(LOGS_DIR)) {
+  try {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
+  } catch (error) {
+    // Silently fail if we can't create the directory
+    console.warn('[Logger] Could not create logs directory, using console logging only');
+  }
 }
 
 interface LogEntry {
@@ -43,13 +53,17 @@ function formatLogEntry(entry: LogEntry): string {
 }
 
 function writeLog(filePath: string, entry: LogEntry): void {
+  // Skip file logging on Vercel or in production (read-only filesystem)
+  if (!ENABLE_FILE_LOGGING || !filePath) {
+    return;
+  }
+  
   try {
     const logLine = formatLogEntry(entry);
     fs.appendFileSync(filePath, logLine, 'utf8');
   } catch (error) {
-    // Fallback to console if file write fails
-    console.error('Failed to write to log file:', error);
-    console.error('Log entry that failed:', entry);
+    // Silently fail - console logging will still work
+    // Don't log the error to avoid infinite loops
   }
 }
 
