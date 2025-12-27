@@ -11,10 +11,20 @@ import { config } from '../config/env';
 
 const router = Router();
 
-// Initialize Stripe with secret key
-    const stripe = new Stripe(config.stripe.secretKey, {
+// Lazy initialization of Stripe - only initialize if key is provided
+let stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripe) {
+    if (!config.stripe.secretKey) {
+      throw new ApiError(503, 'Stripe is not configured. Please contact support.');
+    }
+    stripe = new Stripe(config.stripe.secretKey, {
       apiVersion: '2025-11-17.clover',
     });
+  }
+  return stripe;
+}
 
 // Pricing Plans
 const PLANS = {
@@ -158,7 +168,8 @@ router.post('/create-checkout', asyncHandler(async (req: Request, res: Response)
   }
   
   // Create Stripe checkout session
-  const session = await stripe.checkout.sessions.create({
+  const stripeClient = getStripe();
+  const session = await stripeClient.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
     line_items: [{
@@ -359,7 +370,8 @@ router.post('/customer-portal', asyncHandler(async (req: Request, res: Response)
   }
   
   // Create Stripe customer portal session
-  const session = await stripe.billingPortal.sessions.create({
+  const stripeClient = getStripe();
+  const session = await stripeClient.billingPortal.sessions.create({
     customer: subscription.stripeCustomerId,
     return_url: returnUrl,
   });
