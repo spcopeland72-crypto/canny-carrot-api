@@ -160,14 +160,17 @@ router.post('/:command', async (req, res) => {
     const startTime = Date.now();
     const commandKey = args[0] || 'N/A';
     
+    const logBeforeExecute = {
+      timestamp: new Date().toISOString(),
+      requestId,
+      step: 'REDIS_EXECUTE_START',
+      command,
+      key: commandKey,
+      argsCount: args.length,
+    };
+    console.log('📝 [REDIS-API-LOG]', JSON.stringify(logBeforeExecute));
+    
     try {
-      logger.redis.info(`Executing Redis command: ${command}`, {
-        command,
-        key: commandKey,
-        argsCount: args.length,
-        timestamp: new Date().toISOString(),
-      });
-      
       if (args.length === 0) {
         result = await (redisClient as any)[command]();
       } else if (args.length === 1) {
@@ -181,14 +184,19 @@ router.post('/:command', async (req, res) => {
       }
       
       const duration = Date.now() - startTime;
-      logger.redis.debug(`Redis command ${command} completed`, {
+      const logAfterExecute = {
+        timestamp: new Date().toISOString(),
+        requestId,
+        step: 'REDIS_EXECUTE_SUCCESS',
         command,
-        key: args[0],
+        key: commandKey,
         duration: `${duration}ms`,
-        success: true,
         resultType: typeof result,
-        resultLength: Array.isArray(result) ? result.length : undefined,
-      });
+        resultIsArray: Array.isArray(result),
+        resultLength: Array.isArray(result) ? result.length : (typeof result === 'string' ? result.length : 'N/A'),
+        resultPreview: Array.isArray(result) ? result.slice(0, 5) : (typeof result === 'string' ? result.substring(0, 100) : String(result).substring(0, 100)),
+      };
+      console.log('📝 [REDIS-API-LOG]', JSON.stringify(logAfterExecute));
       
       // Log SADD result (number of members added)
       if (command.toLowerCase() === 'sadd' && args.length >= 2) {
