@@ -115,12 +115,11 @@ if (!process.env.VERCEL) {
 
   startServer();
 } else {
-  // On Vercel, connect Redis on first invocation
+  // On Vercel, don't pre-connect Redis
+  // Connection will happen lazily when Redis is first used
+  // This prevents timeout errors during cold starts
   // The connection will be reused across warm invocations
-  connectRedis().catch(err => {
-    console.error('Failed to connect to Redis on Vercel:', err);
-    // Don't exit - let the function handle errors gracefully
-  });
+  console.log('⚡ Running on Vercel - Redis will connect on first use');
 }
 
 export default app;

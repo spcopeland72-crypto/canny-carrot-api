@@ -6,10 +6,24 @@
  */
 
 import express from 'express';
-import { redisClient, REDIS_KEYS } from '../config/redis';
+import { redisClient, REDIS_KEYS, connectRedis } from '../config/redis';
 import logger from '../utils/logger';
 
 const router = express.Router();
+
+// Middleware to ensure Redis connection
+router.use(async (req, res, next) => {
+  try {
+    await connectRedis();
+    next();
+  } catch (error: any) {
+    logger.redis.error('Failed to connect to Redis', error);
+    return res.status(503).json({
+      error: 'Redis service unavailable',
+      message: 'Unable to connect to database. Please try again later.',
+    });
+  }
+});
 
 /**
  * Execute Redis command via HTTP API

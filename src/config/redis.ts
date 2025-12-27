@@ -1,7 +1,8 @@
 import Redis from 'ioredis';
 import { config } from './env';
 
-// Create Redis client
+// Create Redis client with serverless-optimized settings
+const isVercel = process.env.VERCEL === '1';
 export const redisClient = new Redis(config.redisUrl, {
   maxRetriesPerRequest: 3,
   retryStrategy: (times: number) => {
@@ -9,39 +10,103 @@ export const redisClient = new Redis(config.redisUrl, {
     return delay;
   },
   lazyConnect: true,
+  // Serverless-optimized settings
+  connectTimeout: 10000, // 10 seconds
+  commandTimeout: 5000, // 5 seconds
+  enableReadyCheck: false, // Skip ready check to avoid timeout issues
+  enableOfflineQueue: false, // Don't queue commands when offline
+  keepAlive: 30000, // 30 seconds keepalive
+  // For Vercel: don't auto-reconnect aggressively (serverless functions are ephemeral)
+  ...(isVercel ? {
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1, // Faster failures on Vercel
+  } : {}),
 });
 
-// Connection handler
+// Track connection state
+let connectionPromise: Promise<void> | null = null;
+let isConnected = false;
+
+// Connection handler - lazy connection for serverless
 export const connectRedis = async (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    redisClient.on('connect', () => {
+  // If already connected, return immediately
+  if (isConnected && redisClient.status === 'ready') {
+    return Promise.resolve();
+  }
+  
+  // If already connecting, return existing promise
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  connectionPromise = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      connectionPromise = null;
+      reject(new Error('Redis connection timeout after 10 seconds'));
+    }, 10000);
+
+    const onConnect = () => {
       console.log('📡 Connecting to Redis...');
-    });
+    };
 
-    redisClient.on('ready', () => {
+    const onReady = () => {
+      clearTimeout(timeout);
+      isConnected = true;
       console.log('✅ Redis connection ready');
+      cleanup();
       resolve();
-    });
+    };
 
-    redisClient.on('error', (err) => {
+    const onError = (err: Error) => {
+      clearTimeout(timeout);
+      connectionPromise = null;
+      isConnected = false;
       console.error('❌ Redis connection error:', err.message);
+      cleanup();
       if (config.nodeEnv === 'development') {
         console.log('💡 Running without Redis - using in-memory fallback');
         resolve(); // Don't fail in dev mode
       } else {
         reject(err);
       }
-    });
+    };
 
-    redisClient.connect().catch((err) => {
-      if (config.nodeEnv === 'development') {
-        console.log('⚠️ Redis not available - running in dev mode with fallback');
-        resolve();
-      } else {
-        reject(err);
-      }
-    });
+    const cleanup = () => {
+      redisClient.removeListener('connect', onConnect);
+      redisClient.removeListener('ready', onReady);
+      redisClient.removeListener('error', onError);
+    };
+
+    redisClient.once('connect', onConnect);
+    redisClient.once('ready', onReady);
+    redisClient.once('error', onError);
+
+    // Only connect if not already connecting/connected
+    const status = redisClient.status;
+    if (status === 'end' || status === 'close' || status === 'wait') {
+      redisClient.connect().catch((err) => {
+        clearTimeout(timeout);
+        connectionPromise = null;
+        cleanup();
+        if (config.nodeEnv === 'development') {
+          console.log('⚠️ Redis not available - running in dev mode with fallback');
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+    } else if (status === 'ready') {
+      clearTimeout(timeout);
+      isConnected = true;
+      cleanup();
+      resolve();
+    } else {
+      // Already connecting
+      console.log('⏳ Redis connection in progress...');
+    }
   });
+
+  return connectionPromise;
 };
 
 // Redis key prefixes for organization
@@ -145,4 +210,3 @@ export const redis = {
 };
 
 export default redisClient;
-
