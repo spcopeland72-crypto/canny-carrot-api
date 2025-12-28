@@ -52,13 +52,26 @@ app.get('/', (req, res) => {
 
 // Health check
 app.get('/health', async (req, res) => {
-  const redisStatus = redisClient.status === 'ready' ? 'connected' : 'disconnected';
+  let redisStatus = 'disconnected';
+  let redisError = null;
+  
+  // Actually test Redis connection (since we use lazyConnect)
+  try {
+    await connectRedis();
+    const pingResult = await redisClient.ping();
+    redisStatus = pingResult === 'PONG' ? 'connected' : 'disconnected';
+  } catch (error: any) {
+    redisStatus = 'error';
+    redisError = error.message;
+  }
+  
   res.json({
     status: 'ok',
     service: 'Canny Carrot API',
     version: '1.0.0',
     region: 'Tees Valley',
     redis: redisStatus,
+    redisError: redisError,
     timestamp: new Date().toISOString(),
   });
 });
