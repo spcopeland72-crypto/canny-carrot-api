@@ -17,6 +17,11 @@ build/
 logs/
 *.log
 
+# API Keys (never commit)
+API_KEYS_RESTORED.md
+*_KEYS*.md
+*_SECRETS*.md
+
 # IDE
 .vscode/
 .idea/

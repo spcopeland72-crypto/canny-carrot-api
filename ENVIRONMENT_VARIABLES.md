@@ -9,7 +9,7 @@ These environment variables MUST be set in Vercel for the API to work:
 | Key | Value | Required | Notes |
 |-----|-------|----------|-------|
 | `NODE_ENV` | `production` | ✅ Yes | Environment mode |
-| `REDIS_URL` | `redis://default:9dVAwjHBBYVACe68zaMZ68MYppVhtFFX@redis-15877.crce204.eu-west-2-3.ec2.cloud.redislabs.com:15877` | ✅ Yes | **CRITICAL** - Redis connection string (contains password) |
+| `REDIS_URL` | `redis://canny-carrot:ccRewards99!@redis-15877.crce204.eu-west-2-3.ec2.cloud.redislabs.com:15877` | ✅ Yes | **CRITICAL** - Redis connection string (format: `redis://username:password@host:port`) |
 | `CORS_ORIGINS` | `https://cannycarrot.com,https://www.cannycarrot.com` | ✅ Yes | Comma-separated list of allowed origins |
 | `JWT_SECRET` | `<generate-strong-random-secret>` | ✅ Yes | Must be changed from default - use `openssl rand -hex 32` |
 
