@@ -6,24 +6,9 @@
  */
 
 import express from 'express';
-import { redisClient, REDIS_KEYS, connectRedis } from '../config/redis';
-import logger from '../utils/logger';
+import { redisClient, REDIS_KEYS } from '../config/redis';
 
 const router = express.Router();
-
-// Middleware to ensure Redis connection
-router.use(async (req, res, next) => {
-  try {
-    await connectRedis();
-    next();
-  } catch (error: any) {
-    logger.redis.error('Failed to connect to Redis', error);
-    return res.status(503).json({
-      error: 'Redis service unavailable',
-      message: 'Unable to connect to database. Please try again later.',
-    });
-  }
-});
 
 /**
  * Execute Redis command via HTTP API
@@ -31,24 +16,29 @@ router.use(async (req, res, next) => {
  * Body: { args: any[] }
  */
 router.post('/:command', async (req, res) => {
-  const { command } = req.params;
-  const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
   try {
+    const { command } = req.params;
     const { args = [] } = req.body;
 
+    // ENHANCED: Log ALL incoming requests from form submissions
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔵 [API SERVER] INCOMING REQUEST');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('⏰ Timestamp:', new Date().toISOString());
+    console.log('🌐 Command:', command);
+    console.log('📊 Args Count:', args.length);
+    console.log('🔑 Redis Key:', args[0] || 'N/A');
+    console.log('📍 Source IP:', req.ip || req.socket.remoteAddress || 'unknown');
+    console.log('🔗 User-Agent:', req.get('user-agent') || 'unknown');
+    console.log('📦 Full Request Body:', JSON.stringify({ command, args }, null, 2));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
     // Log all Redis requests for debugging
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      requestId,
-      step: 'REDIS_COMMAND_RECEIVED',
-      command,
+    console.log(`🔵 [API SERVER] Redis command received: ${command}`, {
       key: args[0],
       argsCount: args.length,
-      args: args.length > 2 ? args.slice(0, 2) : args,
-    };
-    logger.redis.info(`Redis command received: ${command}`, logEntry);
-    console.log('📝 [REDIS-API-LOG]', JSON.stringify(logEntry));
+      timestamp: new Date().toISOString()
+    });
 
     // Security: Only allow safe Redis commands
     const allowedCommands = [
@@ -93,61 +83,38 @@ router.post('/:command', async (req, res) => {
     if (command.toLowerCase() === 'set' && args.length >= 2 && args[0].startsWith('business:')) {
       try {
         const businessData = JSON.parse(args[1]);
-        const businessId = businessData.profile?.id || args[0].replace('business:', '');
-        logger.registration.info('NEW BUSINESS REGISTRATION - SET command', {
-          businessId,
-          businessName: businessData.profile?.name,
-          email: businessData.profile?.email,
-          phone: businessData.profile?.phone,
-          contactName: businessData.profile?.contactName,
-          status: businessData.status,
-          subscriptionTier: businessData.subscriptionTier,
-          fullData: businessData,
-        });
         console.log('\n🥕 ============================================');
         console.log('🥕 NEW BUSINESS REGISTRATION');
         console.log('🥕 ============================================');
-        console.log('📋 Business ID:', businessId);
+        console.log('📋 Business ID:', businessData.profile?.id || 'N/A');
         console.log('🏢 Business Name:', businessData.profile?.name || 'N/A');
         console.log('📧 Email:', businessData.profile?.email || 'N/A');
+        console.log('📞 Phone:', businessData.profile?.phone || 'N/A');
+        console.log('👤 Contact Name:', businessData.profile?.contactName || 'N/A');
+        console.log('📍 Address Line 1:', businessData.profile?.addressLine1 || 'N/A');
+        console.log('📍 Address Line 2:', businessData.profile?.addressLine2 || 'N/A');
+        console.log('🏙️  City:', businessData.profile?.city || 'N/A');
+        console.log('📮 Postcode:', businessData.profile?.postcode || 'N/A');
+        console.log('🏷️  Business Type:', businessData.profile?.businessType || 'N/A');
+        console.log('🌐 Website:', businessData.profile?.website || 'N/A');
+        console.log('💼 Subscription Tier:', businessData.subscriptionTier || 'N/A');
+        console.log('📊 Status:', businessData.status || 'N/A');
+        console.log('📅 Join Date:', businessData.joinDate || 'N/A');
         console.log('🥕 ============================================\n');
       } catch (parseError: any) {
-        logger.registration.error('Error parsing business registration data', parseError, {
-          key: args[0],
-          dataLength: args[1]?.length,
-        });
         console.error('❌ [API SERVER] Error parsing business registration data:', parseError.message);
+        console.log('[Redis] SET business data (non-JSON or parse failed)');
       }
     }
 
     // Log when adding business to list
     if (command.toLowerCase() === 'sadd' && args.length >= 2 && args[0] === 'businesses:all') {
-      const businessId = args[1];
-      logger.registration.info('Adding business ID to businesses:all set', {
-        businessId,
-        setKey: 'businesses:all',
-      });
-      logger.redis.info('SADD command - businesses:all', {
-        command: 'sadd',
-        set: 'businesses:all',
-        member: businessId,
-      });
-      console.log('✅ Adding business to businesses list:', businessId);
+      console.log('✅ Adding business to businesses list:', args[1]);
     }
 
     // Log when adding customer to list
     if (command.toLowerCase() === 'sadd' && args.length >= 2 && args[0] === 'customers:all') {
-      const customerId = args[1];
-      logger.registration.info('Adding customer ID to customers:all set', {
-        customerId,
-        setKey: 'customers:all',
-      });
-      logger.redis.info('SADD command - customers:all', {
-        command: 'sadd',
-        set: 'customers:all',
-        member: customerId,
-      });
-      console.log('✅ Adding customer to customers list:', customerId);
+      console.log('✅ Adding customer to customers list:', args[1]);
     }
 
     // Log when checking business list
@@ -157,94 +124,27 @@ router.post('/:command', async (req, res) => {
 
     // Execute command
     let result;
-    const startTime = Date.now();
-    const commandKey = args[0] || 'N/A';
+    if (args.length === 0) {
+      result = await (redisClient as any)[command]();
+    } else if (args.length === 1) {
+      result = await (redisClient as any)[command](args[0]);
+    } else if (args.length === 2) {
+      result = await (redisClient as any)[command](args[0], args[1]);
+    } else if (args.length === 3) {
+      result = await (redisClient as any)[command](args[0], args[1], args[2]);
+    } else {
+      result = await (redisClient as any)[command](...args);
+    }
+
+    console.log(`✅ [API SERVER] Redis command ${command} completed successfully`);
     
-    const logBeforeExecute = {
-      timestamp: new Date().toISOString(),
-      requestId,
-      step: 'REDIS_EXECUTE_START',
-      command,
-      key: commandKey,
-      argsCount: args.length,
-    };
-    console.log('📝 [REDIS-API-LOG]', JSON.stringify(logBeforeExecute));
-    
-    try {
-      if (args.length === 0) {
-        result = await (redisClient as any)[command]();
-      } else if (args.length === 1) {
-        result = await (redisClient as any)[command](args[0]);
-      } else if (args.length === 2) {
-        result = await (redisClient as any)[command](args[0], args[1]);
-      } else if (args.length === 3) {
-        result = await (redisClient as any)[command](args[0], args[1], args[2]);
-      } else {
-        result = await (redisClient as any)[command](...args);
-      }
-      
-      const duration = Date.now() - startTime;
-      const logAfterExecute = {
-        timestamp: new Date().toISOString(),
-        requestId,
-        step: 'REDIS_EXECUTE_SUCCESS',
-        command,
-        key: commandKey,
-        duration: `${duration}ms`,
-        resultType: typeof result,
-        resultIsArray: Array.isArray(result),
-        resultLength: Array.isArray(result) ? result.length : (typeof result === 'string' ? result.length : 'N/A'),
-        resultPreview: Array.isArray(result) ? result.slice(0, 5) : (typeof result === 'string' ? result.substring(0, 100) : String(result).substring(0, 100)),
-      };
-      console.log('📝 [REDIS-API-LOG]', JSON.stringify(logAfterExecute));
-      
-      // Log SADD result (number of members added)
-      if (command.toLowerCase() === 'sadd' && args.length >= 2) {
-        logger.redis.info(`SADD result: ${result} member(s) added to ${args[0]}`, {
-          command: 'sadd',
-          set: args[0],
-          member: args[1],
-          result: result, // Should be 1 if new member added, 0 if already exists
-          success: result >= 0,
-        });
-      }
-      
-      console.log(`✅ [API SERVER] Redis command ${command} completed successfully`);
-      
-      // Log result for smembers on businesses:all
-      if (command.toLowerCase() === 'smembers' && args.length >= 1 && args[0] === 'businesses:all') {
-        const count = Array.isArray(result) ? result.length : 0;
-        logger.redis.info(`SMEMBERS businesses:all - found ${count} business IDs`, {
-          command: 'smembers',
-          set: 'businesses:all',
-          count,
-          businessIds: Array.isArray(result) ? result.slice(0, 10) : [], // Log first 10 IDs
-        });
-        console.log(`📋 [API SERVER] businesses:all contains ${count} business IDs:`, Array.isArray(result) ? result.slice(0, 5) : result);
-      }
-    } catch (execError: any) {
-      const duration = Date.now() - startTime;
-      logger.redis.error(`Redis command ${command} execution failed`, execError, {
-        command,
-        key: args[0],
-        argsCount: args.length,
-        duration: `${duration}ms`,
-      });
-      throw execError; // Re-throw to be caught by outer catch
+    // Log result for smembers on businesses:all
+    if (command.toLowerCase() === 'smembers' && args.length >= 1 && args[0] === 'businesses:all') {
+      console.log(`📋 [API SERVER] businesses:all contains ${Array.isArray(result) ? result.length : 0} business IDs:`, Array.isArray(result) ? result.slice(0, 5) : result);
     }
     
     res.json({ data: result });
   } catch (error: any) {
-    logger.redis.error('Redis proxy error', error, {
-      command,
-      key: req.body?.args?.[0],
-      argsCount: req.body?.args?.length || 0,
-    });
-    logger.error('Redis API endpoint error', error, {
-      command,
-      path: req.path,
-      method: req.method,
-    });
     console.error('❌ [API SERVER] Redis proxy error:', {
       command,
       error: error.message,
