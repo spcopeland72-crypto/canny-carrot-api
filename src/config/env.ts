@@ -20,8 +20,22 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'canny-carrot-dev-secret-change-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   
-  // CORS - Allow both apps (trim whitespace to handle spaces in comma-separated list)
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:8081,http://localhost:8082,http://localhost:3000,http://localhost:3001').split(',').map(origin => origin.trim()),
+  // CORS - Allow both apps
+  // NOTE: localhost origins are included for testing. Remove before final production release.
+  corsOrigins: (() => {
+    const envOrigins = process.env.CORS_ORIGINS || '';
+    const defaultOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:3000,http://localhost:3001';
+    const localhostOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:3000,http://localhost:3001';
+    
+    // Merge environment origins with localhost origins (for testing)
+    const allOrigins = envOrigins 
+      ? `${envOrigins},${localhostOrigins}` 
+      : defaultOrigins;
+    
+    // Remove duplicates
+    const uniqueOrigins = [...new Set(allOrigins.split(',').map(o => o.trim()))];
+    return uniqueOrigins;
+  })(),
   
   // BID API Keys (Business Improvement Districts)
   bidKeys: {
