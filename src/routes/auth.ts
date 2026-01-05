@@ -27,6 +27,16 @@ interface BusinessAuth {
  * Register a business user account (from invitation)
  */
 router.post('/business/register', asyncHandler(async (req: Request, res: Response) => {
+  console.log('🔐 ========================================');
+  console.log('🔐 AUTH ENDPOINT CALL RECEIVED');
+  console.log('🔐 ========================================');
+  console.log('🔐 Request body:', {
+    email: req.body.email,
+    businessId: req.body.businessId,
+    hasPassword: !!req.body.password,
+    passwordLength: req.body.password?.length || 0,
+  });
+  
   await connectRedis();
   
   const { email, password, businessId, invitationToken } = req.body;
@@ -67,11 +77,15 @@ router.post('/business/register', asyncHandler(async (req: Request, res: Respons
   };
   
   const authKey = REDIS_KEYS.businessAuthByEmail(emailLower);
+  console.log('🔐 Storing auth credentials in Redis key:', authKey);
   await redisClient.set(authKey, JSON.stringify(authData));
+  console.log('🔐 ✅ Auth credentials stored in Redis');
   
   // Also create index: business:${businessId}:auth:${email} -> email (for lookup by business)
   const businessAuthIndex = `business:${businessId}:auth:${emailLower}`;
+  console.log('🔐 Creating business auth index:', businessAuthIndex);
   await redisClient.set(businessAuthIndex, emailLower);
+  console.log('🔐 ✅ Business auth index created');
   
   // Generate JWT token
   const token = jwt.sign(
@@ -88,6 +102,15 @@ router.post('/business/register', asyncHandler(async (req: Request, res: Respons
       email: emailLower,
     },
   };
+  
+  console.log('🔐 ✅ AUTH CREATION SUCCESSFUL');
+  console.log('🔐 Created auth data:', {
+    email: emailLower,
+    businessId: businessId,
+    createdAt: authData.createdAt,
+    hasPasswordHash: !!authData.passwordHash,
+  });
+  console.log('🔐 ========================================');
   
   res.status(201).json(response);
 }));
