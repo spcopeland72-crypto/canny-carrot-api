@@ -19,6 +19,7 @@ import paymentRoutes from './routes/payments';
 import integrationRoutes from './routes/integrations';
 import personalisationRoutes from './routes/personalisation';
 import redisRoutes from './routes/redis'; // Redis proxy for mobile apps
+import authRoutes from './routes/auth'; // Authentication routes
 
 const app = express();
 
@@ -29,6 +30,18 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Debug middleware to see what paths Express receives
+app.use((req, res, next) => {
+  console.log('🔍 [INDEX] Request received:', {
+    method: req.method,
+    url: req.url,
+    path: req.path,
+    baseUrl: req.baseUrl,
+    originalUrl: req.originalUrl,
+  });
+  next();
+});
 
 // Root route - API information
 app.get('/', (req, res) => {
@@ -90,6 +103,10 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/integrations', integrationRoutes); // E-commerce integrations
 app.use('/api/v1/personalisation', personalisationRoutes); // AI personalization
 app.use('/api/v1/redis', redisRoutes); // Redis proxy for offline-first sync
+console.log('✅ [INDEX] Registering auth routes at /api/v1/auth');
+console.log('✅ [INDEX] Auth routes type:', typeof authRoutes);
+app.use('/api/v1/auth', authRoutes); // Authentication routes
+console.log('✅ [INDEX] Auth routes registered successfully');
 
 // Error handling
 app.use(errorHandler);
