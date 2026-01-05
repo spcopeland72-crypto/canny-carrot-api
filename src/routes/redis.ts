@@ -6,7 +6,7 @@
  */
 
 import express from 'express';
-import { redisClient, REDIS_KEYS } from '../config/redis';
+import { redisClient, REDIS_KEYS, connectRedis } from '../config/redis';
 
 const router = express.Router();
 
@@ -17,6 +17,9 @@ const router = express.Router();
  */
 router.post('/:command', async (req, res) => {
   try {
+    // Ensure Redis is connected (lazy connection)
+    await connectRedis();
+    
     const { command } = req.params;
     const { args = [] } = req.body;
 
