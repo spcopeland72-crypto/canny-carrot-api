@@ -20,21 +20,8 @@ router.post('/:command', async (req, res) => {
     const { command } = req.params;
     const { args = [] } = req.body;
 
-    // ENHANCED: Log ALL incoming requests from form submissions
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔵 [API SERVER] INCOMING REQUEST');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('⏰ Timestamp:', new Date().toISOString());
-    console.log('🌐 Command:', command);
-    console.log('📊 Args Count:', args.length);
-    console.log('🔑 Redis Key:', args[0] || 'N/A');
-    console.log('📍 Source IP:', req.ip || req.socket.remoteAddress || 'unknown');
-    console.log('🔗 User-Agent:', req.get('user-agent') || 'unknown');
-    console.log('📦 Full Request Body:', JSON.stringify({ command, args }, null, 2));
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
     // Log all Redis requests for debugging
-    console.log(`🔵 [API SERVER] Redis command received: ${command}`, {
+    console.log(`\n🔵 [API SERVER] Redis command received: ${command}`, {
       key: args[0],
       argsCount: args.length,
       timestamp: new Date().toISOString()
@@ -145,6 +132,7 @@ router.post('/:command', async (req, res) => {
     
     res.json({ data: result });
   } catch (error: any) {
+    const command = req.params.command || 'unknown';
     console.error('❌ [API SERVER] Redis proxy error:', {
       command,
       error: error.message,
