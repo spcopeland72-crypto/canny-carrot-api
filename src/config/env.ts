@@ -21,16 +21,20 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   
   // CORS - Allow both apps
-  // NOTE: localhost origins are included for testing. Remove before final production release.
+  // Production domains for PWA apps
   corsOrigins: (() => {
     const envOrigins = process.env.CORS_ORIGINS || '';
-    const defaultOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:3000,http://localhost:3001';
-    const localhostOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:3000,http://localhost:3001';
+    const defaultOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:8084,http://localhost:3000,http://localhost:3001';
+    const localhostOrigins = 'http://localhost:8081,http://localhost:8082,http://localhost:8084,http://localhost:3000,http://localhost:3001';
+    // Add local network IP addresses for home network testing
+    const localNetworkOrigins = 'http://192.168.0.36:8081,http://192.168.0.36:8082,http://192.168.0.36:8084,http://192.168.0.36:3000,http://192.168.0.36:3001';
+    // Production PWA domains
+    const productionOrigins = 'https://customer.cannycarrot.com,https://business.cannycarrot.com,https://cannycarrot.com,https://www.cannycarrot.com,https://admin.cannycarrot.com';
     
-    // Merge environment origins with localhost origins (for testing)
+    // Merge environment origins with localhost, local network, and production origins
     const allOrigins = envOrigins 
-      ? `${envOrigins},${localhostOrigins}` 
-      : defaultOrigins;
+      ? `${envOrigins},${localhostOrigins},${localNetworkOrigins},${productionOrigins}` 
+      : `${defaultOrigins},${localNetworkOrigins},${productionOrigins}`;
     
     // Remove duplicates
     const uniqueOrigins = [...new Set(allOrigins.split(',').map(o => o.trim()))];
