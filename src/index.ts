@@ -24,9 +24,6 @@ import authRoutes from './routes/auth'; // Authentication routes
 
 const app = express();
 
-// Initialize repository copies service
-initializeRepositoryCopies();
-
 // Security middleware
 app.use(helmet());
 app.use(cors({

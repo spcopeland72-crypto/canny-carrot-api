@@ -7,11 +7,16 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { constants as fsConstants } from 'fs';
 import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import type { Business, Reward, Campaign, Member } from '../types';
 
-// Repository copies directory (relative to project root)
-const REPO_COPIES_DIR = path.join(process.cwd(), 'repo-copies');
+// Repository copies directory
+// On Vercel (serverless), use /tmp (ephemeral storage)
+// On traditional servers, use project root
+const REPO_COPIES_DIR = process.env.VERCEL 
+  ? '/tmp/repo-copies'
+  : path.join(process.cwd(), 'repo-copies');
 
 /**
  * Sanitize business name for use as directory name
@@ -28,8 +33,23 @@ const sanitizeBusinessName = (name: string): string => {
  * Ensure directory exists, create if it doesn't
  */
 const ensureDirectory = (dirPath: string): void => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (error: any) {
+    // On Vercel /tmp may not exist, create it
+    if (error.code === 'ENOENT' && dirPath.startsWith('/tmp')) {
+      try {
+        fs.mkdirSync('/tmp', { recursive: true });
+        fs.mkdirSync(dirPath, { recursive: true });
+      } catch (retryError: any) {
+        console.error(`❌ [REPO COPY] Failed to create directory ${dirPath}:`, retryError.message);
+        throw retryError;
+      }
+    } else {
+      throw error;
+    }
   }
 };
 
@@ -65,7 +85,26 @@ const getBusinessDir = async (businessId: string): Promise<string> => {
  */
 export const saveRepositoryCopy = async (businessId: string): Promise<void> => {
   try {
+    // On Vercel, only save if we have write access (skip if /tmp isn't available)
+    if (process.env.VERCEL) {
+      try {
+        // Test if /tmp is writable
+        fs.accessSync('/tmp', fsConstants.W_OK);
+      } catch (error) {
+        console.warn(`⚠️ [REPO COPY] /tmp not writable on Vercel, skipping repository copy`);
+        return;
+      }
+    }
+    
     console.log(`📁 [REPO COPY] Saving repository copy for business: ${businessId}`);
+    
+    // Ensure base directory exists before getting business dir
+    try {
+      ensureDirectory(REPO_COPIES_DIR);
+    } catch (error: any) {
+      console.warn(`⚠️ [REPO COPY] Failed to create base directory, skipping: ${error.message}`);
+      return;
+    }
     
     const businessDir = await getBusinessDir(businessId);
     const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
@@ -230,9 +269,21 @@ export const saveEntityCopy = async (
 
 /**
  * Initialize repository copies directory
+ * Only called on traditional servers, not on Vercel (serverless)
+ * On Vercel, directories are created lazily when needed
  */
 export const initializeRepositoryCopies = (): void => {
-  ensureDirectory(REPO_COPIES_DIR);
-  console.log(`📁 [REPO COPY] Repository copies directory initialized: ${REPO_COPIES_DIR}`);
+  // Skip initialization on Vercel - directories created lazily
+  if (process.env.VERCEL) {
+    console.log(`📁 [REPO COPY] Running on Vercel - repository copies will use /tmp (ephemeral)`);
+    return;
+  }
+  
+  try {
+    ensureDirectory(REPO_COPIES_DIR);
+    console.log(`📁 [REPO COPY] Repository copies directory initialized: ${REPO_COPIES_DIR}`);
+  } catch (error: any) {
+    console.warn(`⚠️ [REPO COPY] Failed to initialize directory (will create lazily): ${error.message}`);
+  }
 };
 
