@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Campaign } from '../types';
+import { saveEntityCopy } from '../services/repositoryCopyService';
 
 const router = Router();
 
@@ -142,6 +143,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     await queueNotifications(businessId, campaign);
   }
   
+  // Save repository copy when campaign is created
+  saveEntityCopy(businessId, 'campaign', id).catch(err => {
+    console.error('[CAMPAIGNS] Error saving repository copy:', err);
+  });
+  
   res.status(201).json({
     success: true,
     data: campaign,
@@ -172,6 +178,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(updatedCampaign));
+  
+  // Save repository copy when campaign is updated
+  saveEntityCopy(campaign.businessId, 'campaign', id).catch(err => {
+    console.error('[CAMPAIGNS] Error saving repository copy:', err);
+  });
   
   res.json({
     success: true,
@@ -337,6 +348,8 @@ router.get('/active/member/:memberId', asyncHandler(async (req: Request, res: Re
 }));
 
 export default router;
+
+
 
 
 

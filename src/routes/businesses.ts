@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Business, ApiResponse } from '../types';
+import { saveEntityCopy } from '../services/repositoryCopyService';
 
 const router = Router();
 
@@ -146,6 +147,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redis.setBusiness(id, updated);
+  
+  // Save repository copy when business profile is updated
+  saveEntityCopy(id, 'business').catch(err => {
+    console.error('[BUSINESSES] Error saving repository copy:', err);
+  });
   
   const response: ApiResponse<Business> = {
     success: true,

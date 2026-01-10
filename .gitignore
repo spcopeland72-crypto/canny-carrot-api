@@ -32,3 +32,6 @@ API_KEYS_RESTORED.md
 # OS
 .DS_Store
 Thumbs.db
+
+# Repository copies (contains business data - do not commit)
+repo-copies/

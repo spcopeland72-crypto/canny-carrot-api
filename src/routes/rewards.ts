@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Reward, ApiResponse } from '../types';
+import { saveEntityCopy } from '../services/repositoryCopyService';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 
 // POST /api/v1/rewards - Create a new reward
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const { businessId, name, description, stampsRequired, type, value, expiresAt, maxRedemptions } = req.body;
+  const { id, businessId, name, description, stampsRequired, type, value, expiresAt, maxRedemptions } = req.body;
   
   if (!businessId || !name || !stampsRequired) {
     throw new ApiError(400, 'Business ID, name, and stamps required are mandatory');
@@ -53,11 +54,52 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
-  const id = uuidv4();
+  // Use provided ID if valid, otherwise generate new one
+  // This allows app to sync rewards with existing IDs
+  const rewardId = id && typeof id === 'string' && id.length > 0 ? id : uuidv4();
   const now = new Date().toISOString();
   
+  // Check if reward with this ID already exists (for idempotency)
+  const existingRewardData = await redisClient.get(REDIS_KEYS.reward(rewardId));
+  if (existingRewardData) {
+    // Reward exists - update it instead of creating duplicate
+    const existingReward = JSON.parse(existingRewardData);
+    const updatedReward: Reward = {
+      ...existingReward,
+      name,
+      description: description !== undefined ? description : existingReward.description,
+      stampsRequired: stampsRequired || existingReward.stampsRequired,
+      costStamps: stampsRequired || existingReward.stampsRequired,
+      type: type || existingReward.type,
+      value: value !== undefined ? value : existingReward.value,
+      validTo: expiresAt || existingReward.validTo,
+      expiresAt: expiresAt || existingReward.expiresAt,
+      maxRedemptions: maxRedemptions !== undefined ? maxRedemptions : existingReward.maxRedemptions,
+      updatedAt: now,
+    };
+    
+    await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(updatedReward));
+    
+    // Ensure it's in the business rewards set
+    await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), rewardId);
+    
+    // API is a transparent forwarder - does not modify business.updatedAt
+    // App is responsible for updating business profile timestamp when syncing
+    
+    // Save repository copy when reward is updated
+    saveEntityCopy(businessId, 'reward', rewardId).catch(err => {
+      console.error('[REWARDS] Error saving repository copy:', err);
+    });
+    
+    return res.json({
+      success: true,
+      data: updatedReward,
+    });
+  }
+  
+  // Create new reward
   const reward: Reward = {
-    id,
+    id: rewardId,
     businessId,
     name,
     description: description || '',
@@ -76,28 +118,25 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   };
   
   // Store reward
-  await redisClient.set(REDIS_KEYS.reward(id), JSON.stringify(reward));
+  await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(reward));
   
   // Add to business's reward set
-  await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), id);
+  await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), rewardId);
   
-  // Update business stats
-  const updatedBusiness = {
-    ...business,
-    stats: {
-      ...business.stats,
-      activeRewards: (business.stats.activeRewards || 0) + 1,
-    },
-    updatedAt: now,
-  };
-  await redis.setBusiness(businessId, updatedBusiness);
-  
-  const response: ApiResponse<Reward> = {
-    success: true,
-    data: reward,
-  };
-  
-  res.status(201).json(response);
+    // API is a transparent forwarder - does not modify business stats or timestamps
+    // App is responsible for updating business profile and stats when syncing
+    
+    // Save repository copy when reward is created
+    saveEntityCopy(businessId, 'reward', rewardId).catch(err => {
+      console.error('[REWARDS] Error saving repository copy:', err);
+    });
+    
+    const response: ApiResponse<Reward> = {
+      success: true,
+      data: reward,
+    };
+    
+    res.status(201).json(response);
 }));
 
 // GET /api/v1/rewards/:id - Get a specific reward
@@ -141,6 +180,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redisClient.set(REDIS_KEYS.reward(id), JSON.stringify(updated));
+  
+  // Save repository copy when reward is updated via PUT
+  saveEntityCopy(existing.businessId, 'reward', id).catch(err => {
+    console.error('[REWARDS] Error saving repository copy:', err);
+  });
   
   const response: ApiResponse<Reward> = {
     success: true,

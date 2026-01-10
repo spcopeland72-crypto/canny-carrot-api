@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { config } from './config/env';
 import { redisClient, connectRedis } from './config/redis';
 import { errorHandler } from './middleware/errorHandler';
+import { initializeRepositoryCopies } from './services/repositoryCopyService';
 
 // Routes
 import memberRoutes from './routes/members';
@@ -22,6 +23,9 @@ import redisRoutes from './routes/redis'; // Redis proxy for mobile apps
 import authRoutes from './routes/auth'; // Authentication routes
 
 const app = express();
+
+// Initialize repository copies service
+initializeRepositoryCopies();
 
 // Security middleware
 app.use(helmet());
