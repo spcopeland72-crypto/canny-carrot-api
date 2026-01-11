@@ -44,7 +44,18 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { id, businessId, name, description, stampsRequired, type, value, expiresAt, maxRedemptions } = req.body;
   
+  console.log('\n🥕 ============================================');
+  console.log('🥕 REWARD CREATION REQUEST');
+  console.log('🥕 ============================================');
+  console.log('📋 Reward Name:', name);
+  console.log('📋 Business ID:', businessId);
+  console.log('📋 Reward ID:', id);
+  console.log('📋 Stamps Required:', stampsRequired);
+  console.log('📋 Type:', type);
+  console.log('🥕 ============================================\n');
+  
   if (!businessId || !name || !stampsRequired) {
+    console.error('❌ [REWARDS] Missing required fields:', { businessId: !!businessId, name: !!name, stampsRequired: !!stampsRequired });
     throw new ApiError(400, 'Business ID, name, and stamps required are mandatory');
   }
   
