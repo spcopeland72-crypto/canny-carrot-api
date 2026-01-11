@@ -1,0 +1,80 @@
+{
+  "businessId": "business_1767744076082_i3d1uu42x",
+  "timestamp": "2026-01-10T22:02:08.119Z",
+  "business": {
+    "profile": {
+      "id": "business_1767744076082_i3d1uu42x",
+      "name": "The Stables",
+      "email": "laverickclare@hotmail.com",
+      "phone": "07969378747",
+      "contactName": "Clare Langley",
+      "addressLine1": "7 Elderberry Close",
+      "addressLine2": "",
+      "city": "",
+      "postcode": "TS22 5US",
+      "country": "UK",
+      "businessType": "Pub",
+      "category": "Free Item",
+      "description": "Public house",
+      "website": "https://cannycarrot.com",
+      "socialMedia": {
+        "facebook": "canny_carrot_rewards",
+        "instagram": "canny_carrot_rewards",
+        "twitter": "canny_carrot_rewards",
+        "tiktok": "",
+        "linkedin": ""
+      },
+      "teamSize": "7",
+      "CRMIntegration": false,
+      "notificationsOptIn": true,
+      "createdAt": "2026-01-07T00:01:16.080Z",
+      "updatedAt": "2026-01-07T00:01:16.080Z"
+    },
+    "subscriptionTier": "gold",
+    "status": "ACTIVE",
+    "joinDate": "2026-01-07T00:01:16.080Z",
+    "onboardingCompleted": false,
+    "rewards": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "campaigns": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "customerCount": 0,
+    "totalScans": 0,
+    "updatedAt": "2026-01-10T21:39:19.187Z",
+    "id": "business_1767744076082_i3d1uu42x",
+    "name": "The Stables",
+    "email": "laverickclare@hotmail.com",
+    "phone": "07969378747",
+    "addressLine1": "7 Elderberry Close",
+    "addressLine2": "",
+    "city": "",
+    "postcode": "TS22 5US",
+    "country": "UK",
+    "website": "https://cannycarrot.com",
+    "socialMedia": {
+      "facebook": "canny_carrot_rewards",
+      "instagram": "canny_carrot_rewards",
+      "twitter": "canny_carrot_rewards",
+      "tiktok": "",
+      "linkedin": ""
+    },
+    "category": "Free Item",
+    "description": "Public house",
+    "createdAt": "2026-01-07T00:01:16.080Z"
+  },
+  "rewards": [],
+  "campaigns": [],
+  "customers": [],
+  "auth": {
+    "email": "laverickclare@hotmail.com",
+    "passwordHash": "$2a$10$7b.lvy77EmnHjI.MW4Zz6Ot71UBtShLQ3XE2mjYF.LOqV2luC9tOW",
+    "businessId": "business_1767744076082_i3d1uu42x",
+    "createdAt": "2026-01-07T00:01:17.177Z"
+  }
+}

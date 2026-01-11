@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build",
+    "list-emails": "ts-node-dev --transpile-only scripts/list-all-emails.ts"
   },
   "keywords": [
     "loyalty",
