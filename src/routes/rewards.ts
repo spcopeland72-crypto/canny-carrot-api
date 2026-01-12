@@ -42,7 +42,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 
 // POST /api/v1/rewards - Create a new reward
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const { id, businessId, name, description, stampsRequired, type, value, expiresAt, maxRedemptions } = req.body;
+  // Accept full reward object from client - API is a transparent forwarder
+  const { id, businessId, name, stampsRequired } = req.body;
   
   console.log('\n🥕 ============================================');
   console.log('🥕 REWARD CREATION REQUEST');
@@ -51,7 +52,6 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   console.log('📋 Business ID:', businessId);
   console.log('📋 Reward ID:', id);
   console.log('📋 Stamps Required:', stampsRequired);
-  console.log('📋 Type:', type);
   console.log('🥕 ============================================\n');
   
   if (!businessId || !name || !stampsRequired) {
@@ -73,20 +73,16 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Check if reward with this ID already exists (for idempotency)
   const existingRewardData = await redisClient.get(REDIS_KEYS.reward(rewardId));
   if (existingRewardData) {
-    // Reward exists - update it instead of creating duplicate
+    // Reward exists - merge with existing, preserving all fields
     const existingReward = JSON.parse(existingRewardData);
-    const updatedReward: Reward = {
-      ...existingReward,
-      name,
-      description: description !== undefined ? description : existingReward.description,
-      stampsRequired: stampsRequired || existingReward.stampsRequired,
-      costStamps: stampsRequired || existingReward.stampsRequired,
-      type: type || existingReward.type,
-      value: value !== undefined ? value : existingReward.value,
-      validTo: expiresAt || existingReward.validTo,
-      expiresAt: expiresAt || existingReward.expiresAt,
-      maxRedemptions: maxRedemptions !== undefined ? maxRedemptions : existingReward.maxRedemptions,
-      updatedAt: now,
+    // API is a transparent forwarder - preserve updatedAt from request, or keep existing
+    // Do NOT auto-update timestamps - app manages timestamps
+    const updatedReward: any = {
+      ...existingReward, // Preserve all existing fields
+      ...req.body, // Update with new values from request (includes updatedAt if provided)
+      id: rewardId, // Ensure ID can't be changed
+      businessId: existingReward.businessId, // Ensure business can't be changed
+      updatedAt: req.body.updatedAt !== undefined ? req.body.updatedAt : existingReward.updatedAt, // Preserve from request or existing
     };
     
     await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(updatedReward));
@@ -108,24 +104,16 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     });
   }
   
-  // Create new reward
-  const reward: Reward = {
+  // API is a transparent forwarder - use request body as-is, only set defaults for required fields
+  // Do NOT auto-update timestamps - app manages timestamps
+  const reward: any = {
+    ...req.body, // Include ALL fields from request (selectedProducts, pinCode, qrCode, timestamps, etc.)
     id: rewardId,
     businessId,
-    name,
-    description: description || '',
-    stampsRequired,
-    costStamps: stampsRequired,  // Map to new field
-    type: type || 'freebie',
-    value,
-    isActive: true,
-    validFrom: now,
-    validTo: expiresAt,
-    expiresAt,  // Keep for backward compatibility
-    createdAt: now,
-    updatedAt: now,
-    maxRedemptions,
-    currentRedemptions: 0,
+    createdAt: req.body.createdAt || now, // Only set if not provided
+    updatedAt: req.body.updatedAt || now, // Only set if not provided
+    currentRedemptions: req.body.currentRedemptions !== undefined ? req.body.currentRedemptions : 0,
+    isActive: req.body.isActive !== undefined ? req.body.isActive : true,
   };
   
   // Store reward
@@ -142,7 +130,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       console.error('[REWARDS] Error saving repository copy:', err);
     });
     
-    const response: ApiResponse<Reward> = {
+    const response: ApiResponse<any> = {
       success: true,
       data: reward,
     };

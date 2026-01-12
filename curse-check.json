@@ -1,0 +1,95 @@
+{
+  "businessId": "business_1767744076082_i3d1uu42x",
+  "timestamp": "2026-01-11T00:51:20.645Z",
+  "business": {
+    "profile": {
+      "id": "business_1767744076082_i3d1uu42x",
+      "name": "The Stables",
+      "email": "laverickclare@hotmail.com",
+      "phone": "07969378747",
+      "contactName": "Clare Langley",
+      "addressLine1": "7 Elderberry Close",
+      "addressLine2": "",
+      "city": "",
+      "postcode": "TS22 5US",
+      "country": "UK",
+      "businessType": "Pub",
+      "category": "Free Item",
+      "description": "Public house",
+      "website": "https://cannycarrot.com",
+      "socialMedia": {
+        "facebook": "canny_carrot_rewards",
+        "instagram": "canny_carrot_rewards",
+        "twitter": "canny_carrot_rewards",
+        "tiktok": "",
+        "linkedin": ""
+      },
+      "teamSize": "7",
+      "CRMIntegration": false,
+      "notificationsOptIn": true,
+      "createdAt": "2026-01-07T00:01:16.080Z",
+      "updatedAt": "2026-01-07T00:01:16.080Z"
+    },
+    "subscriptionTier": "gold",
+    "status": "ACTIVE",
+    "joinDate": "2026-01-07T00:01:16.080Z",
+    "onboardingCompleted": false,
+    "rewards": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "campaigns": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "customerCount": 0,
+    "totalScans": 0,
+    "updatedAt": "2026-01-11T00:42:34.093Z",
+    "id": "business_1767744076082_i3d1uu42x",
+    "name": "The Stables",
+    "email": "laverickclare@hotmail.com",
+    "phone": "07969378747",
+    "addressLine1": "7 Elderberry Close",
+    "addressLine2": "",
+    "city": "",
+    "postcode": "TS22 5US",
+    "country": "UK",
+    "website": "https://cannycarrot.com",
+    "socialMedia": {
+      "facebook": "canny_carrot_rewards",
+      "instagram": "canny_carrot_rewards",
+      "twitter": "canny_carrot_rewards",
+      "tiktok": "",
+      "linkedin": ""
+    },
+    "category": "Free Item",
+    "description": "Public house",
+    "createdAt": "2026-01-07T00:01:16.080Z"
+  },
+  "rewards": [
+    {
+      "id": "1768092557829",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "curse of cursor",
+      "description": "",
+      "stampsRequired": 5,
+      "costStamps": 5,
+      "type": "freebie",
+      "isActive": true,
+      "validFrom": "2026-01-11T00:49:19.822Z",
+      "createdAt": "2026-01-11T00:49:19.822Z",
+      "updatedAt": "2026-01-11T00:49:19.822Z",
+      "currentRedemptions": 0
+    }
+  ],
+  "campaigns": [],
+  "customers": [],
+  "auth": {
+    "email": "laverickclare@hotmail.com",
+    "passwordHash": "$2a$10$7b.lvy77EmnHjI.MW4Zz6Ot71UBtShLQ3XE2mjYF.LOqV2luC9tOW",
+    "businessId": "business_1767744076082_i3d1uu42x",
+    "createdAt": "2026-01-07T00:01:17.177Z"
+  }
+}

@@ -171,10 +171,12 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'Cannot update completed campaigns');
   }
   
+  // API is a transparent forwarder - preserve updatedAt from request, or keep existing
+  // Do NOT auto-update timestamps - app manages timestamps
   const updatedCampaign = {
     ...campaign,
     ...updates,
-    updatedAt: new Date().toISOString(),
+    updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : campaign.updatedAt, // Preserve from request or existing
   };
   
   await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(updatedCampaign));
@@ -206,9 +208,10 @@ router.put('/:id/status', asyncHandler(async (req: Request, res: Response) => {
   
   const campaign = JSON.parse(data);
   
-  // Update status
+  // API is a transparent forwarder - preserve updatedAt from request, or keep existing
+  // Do NOT auto-update timestamps - admin/client manages timestamps
   campaign.status = status;
-  campaign.updatedAt = new Date().toISOString();
+  campaign.updatedAt = req.body.updatedAt !== undefined ? req.body.updatedAt : campaign.updatedAt; // Preserve from request or existing
   
   // If activating, send notifications
   if (status === 'active' && campaign.notificationMessage) {
