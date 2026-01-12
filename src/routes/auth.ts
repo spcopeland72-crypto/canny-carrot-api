@@ -159,6 +159,33 @@ router.post('/business/login', asyncHandler(async (req: Request, res: Response) 
     { expiresIn: '7d' }
   );
   
+  // Track device login (if deviceId provided)
+  const { deviceId } = req.body;
+  if (deviceId && typeof deviceId === 'string') {
+    try {
+      const deviceKey = REDIS_KEYS.businessDevices(authData.businessId);
+      const deviceInfo = {
+        deviceId,
+        email: emailLower,
+        lastLoginAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      // Store device info as hash: business:${businessId}:devices:${deviceId} -> {deviceId, email, lastLoginAt, createdAt}
+      await redisClient.set(
+        `business:${authData.businessId}:devices:${deviceId}`,
+        JSON.stringify(deviceInfo),
+        'EX',
+        60 * 60 * 24 * 30 // Expire after 30 days of inactivity
+      );
+      // Also add deviceId to set for quick lookup: business:${businessId}:devices -> set of deviceIds
+      await redisClient.sadd(deviceKey, deviceId);
+      console.log(`📱 [AUTH] Device login tracked: ${deviceId} for business ${authData.businessId}`);
+    } catch (error: any) {
+      // Don't fail login if device tracking fails
+      console.error('⚠️ [AUTH] Failed to track device login:', error.message);
+    }
+  }
+  
   const response: ApiResponse<{ token: string; businessId: string; email: string }> = {
     success: true,
     data: {

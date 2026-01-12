@@ -122,6 +122,7 @@ export const REDIS_KEYS = {
   businessBySlug: (slug: string) => `business:slug:${slug}`,
   businessMembers: (businessId: string) => `business:${businessId}:members`,
   businessAuthByEmail: (email: string) => `business:auth:${email.toLowerCase()}`,
+  businessDevices: (businessId: string) => `business:${businessId}:devices`,
   
   // Rewards
   reward: (id: string) => `reward:${id}`,
@@ -148,28 +149,28 @@ export const REDIS_KEYS = {
   
   // Gamification & Leaderboards
   leaderboard: (type: 'stamps' | 'redemptions' | 'points' | 'referrals') => `leaderboard:${type}`,
-  memberAchievements: (memberId: string) => `member:${memberId}:achievements`,
-  memberRank: (memberId: string, type: string) => `member:${memberId}:rank:${type}`,
+  customerAchievements: (customerId: string) => `customer:${customerId}:achievements`,
+  customerRank: (customerId: string, type: string) => `customer:${customerId}:rank:${type}`,
   
   // Notifications
   notification: (id: string) => `notification:${id}`,
-  memberNotifications: (memberId: string) => `member:${memberId}:notifications`,
+  customerNotifications: (customerId: string) => `customer:${customerId}:notifications`,
 };
 
 // Helper functions for common operations
 export const redis = {
-  // Member operations
-  async getMember(id: string) {
-    const data = await redisClient.get(REDIS_KEYS.member(id));
+  // Customer operations
+  async getCustomer(id: string) {
+    const data = await redisClient.get(REDIS_KEYS.customer(id));
     return data ? JSON.parse(data) : null;
   },
   
-  async setMember(id: string, member: any, expirySeconds?: number) {
-    const key = REDIS_KEYS.member(id);
+  async setCustomer(id: string, customer: any, expirySeconds?: number) {
+    const key = REDIS_KEYS.customer(id);
     if (expirySeconds) {
-      await redisClient.setex(key, expirySeconds, JSON.stringify(member));
+      await redisClient.setex(key, expirySeconds, JSON.stringify(customer));
     } else {
-      await redisClient.set(key, JSON.stringify(member));
+      await redisClient.set(key, JSON.stringify(customer));
     }
   },
   
@@ -184,8 +185,8 @@ export const redis = {
   },
   
   // Stamp tracking
-  async addStamp(memberId: string, businessId: string, stampData: any) {
-    const key = REDIS_KEYS.memberStamps(memberId, businessId);
+  async addStamp(customerId: string, businessId: string, stampData: any) {
+    const key = REDIS_KEYS.customerStamps(customerId, businessId);
     await redisClient.rpush(key, JSON.stringify({
       ...stampData,
       timestamp: new Date().toISOString(),
@@ -193,8 +194,8 @@ export const redis = {
     return redisClient.llen(key);
   },
   
-  async getStampCount(memberId: string, businessId: string) {
-    const key = REDIS_KEYS.memberStamps(memberId, businessId);
+  async getStampCount(customerId: string, businessId: string) {
+    const key = REDIS_KEYS.customerStamps(customerId, businessId);
     return redisClient.llen(key);
   },
   
