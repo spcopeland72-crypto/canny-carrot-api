@@ -31,7 +31,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   
   const stamp: Stamp = {
     id,
-    memberId,
+    customerId: memberId,  // Map memberId to customerId
+    memberId,              // Keep memberId for backward compatibility
     businessId,
     rewardId: rewardId || '',
     issuedAt: now,
@@ -138,7 +139,8 @@ router.post('/redeem', asyncHandler(async (req: Request, res: Response) => {
   
   const redemption: Redemption = {
     id,
-    memberId,
+    customerId: memberId,  // Map memberId to customerId
+    memberId,              // Keep memberId for backward compatibility
     businessId,
     rewardId,
     redeemedAt: now,

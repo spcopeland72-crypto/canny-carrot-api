@@ -60,7 +60,7 @@ router.get('/regional', asyncHandler(async (req: Request, res: Response) => {
     },
     totals: {
       businesses: 0,
-      members: 0,
+      customers: 0,
       stamps: 0,
       redemptions: 0,
       estimatedEconomicImpact: 0,

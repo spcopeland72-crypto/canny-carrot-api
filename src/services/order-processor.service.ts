@@ -250,7 +250,8 @@ export class OrderProcessorService {
     
     const stamp: Stamp = {
       id: stampId,
-      memberId: member.id,
+      customerId: member.id,  // Map member.id to customerId
+      memberId: member.id,     // Keep memberId for backward compatibility
       businessId: business.id,
       rewardId: '', // Will be determined by reward rules
       issuedAt: now,

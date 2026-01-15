@@ -29,6 +29,9 @@ export interface Customer {
   }>;
 }
 
+// Member type (alias for Customer - for backward compatibility)
+export type Member = Customer;
+
 export interface CustomerPreferences {
   notifications: boolean;
   push?: boolean;
@@ -123,6 +126,7 @@ export interface Reward {
 export interface Stamp {
   id: string;
   customerId: string;
+  memberId?: string;             // Legacy alias for customerId (backward compatibility)
   businessId: string;
   programId?: string;            // For multi-program support
   locationId?: string;           // Which location issued it
@@ -140,6 +144,7 @@ export interface Stamp {
 export interface Redemption {
   id: string;
   customerId: string;
+  memberId?: string;             // Legacy alias for customerId (backward compatibility)
   businessId: string;
   rewardId: string;
   redeemedAt: string;

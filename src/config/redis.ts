@@ -117,6 +117,13 @@ export const REDIS_KEYS = {
   memberByPhone: (phone: string) => `member:phone:${phone}`,
   memberStamps: (memberId: string, businessId: string) => `member:${memberId}:stamps:${businessId}`,
   
+  // Customers (alias for members)
+  customer: (id: string) => `customer:${id}`,
+  customerByEmail: (email: string) => `customer:email:${email}`,
+  customerByPhone: (phone: string) => `customer:phone:${phone}`,
+  customerStamps: (customerId: string, businessId: string) => `customer:${customerId}:stamps:${businessId}`,
+  businessCustomers: (businessId: string) => `business:${businessId}:customers`,
+  
   // Businesses
   business: (id: string) => `business:${id}`,
   businessBySlug: (slug: string) => `business:slug:${slug}`,
@@ -171,6 +178,30 @@ export const redis = {
       await redisClient.setex(key, expirySeconds, JSON.stringify(customer));
     } else {
       await redisClient.set(key, JSON.stringify(customer));
+    }
+  },
+  
+  // Member operations (alias for customer - for backward compatibility)
+  async getMember(id: string) {
+    // Try customer first, then member for backward compatibility
+    let data = await redisClient.get(REDIS_KEYS.customer(id));
+    if (!data) {
+      data = await redisClient.get(REDIS_KEYS.member(id));
+    }
+    return data ? JSON.parse(data) : null;
+  },
+  
+  async setMember(id: string, member: any, expirySeconds?: number) {
+    // Store as both customer and member for backward compatibility
+    const customerKey = REDIS_KEYS.customer(id);
+    const memberKey = REDIS_KEYS.member(id);
+    const jsonValue = JSON.stringify(member);
+    if (expirySeconds) {
+      await redisClient.setex(customerKey, expirySeconds, jsonValue);
+      await redisClient.setex(memberKey, expirySeconds, jsonValue);
+    } else {
+      await redisClient.set(customerKey, jsonValue);
+      await redisClient.set(memberKey, jsonValue);
     }
   },
   
