@@ -94,7 +94,7 @@ export interface BusinessStats {
 }
 
 export interface Reward {
-  id: string;
+  id: string;                    // Unique ID: businessID + reward identifier
   businessId: string;
   programId?: string;           // For multi-program support
   name: string;
@@ -117,8 +117,13 @@ export interface Reward {
   };
   maxRedemptions?: number;
   currentRedemptions: number;
-  // Customer progress tracking: customerId -> points collected
-  customerProgress?: Record<string, number>;  // Maps customerId to points earned
+  // Customer progress tracking: customerId -> { points, actions }
+  // Each customer who has scanned this reward's QR code is tracked here
+  // actions: actionId -> count of times that action was completed
+  customerProgress?: Record<string, {
+    points: number;              // Points awarded to this customer
+    actions: Record<string, number>; // actionId -> count of actions completed
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -154,7 +159,7 @@ export interface Redemption {
 
 // Campaign types
 export interface Campaign {
-  id: string;
+  id: string;                    // Unique ID: businessID + campaign identifier
   businessId: string;
   name: string;
   description: string;
@@ -176,8 +181,13 @@ export interface Campaign {
     geo: boolean;
   };
   notificationMessage?: string;
-  // Customer progress tracking: customerId -> points collected
-  customerProgress?: Record<string, number>;  // Maps customerId to points earned
+  // Customer progress tracking: customerId -> { points, actions }
+  // Each customer who has scanned this campaign's QR code is tracked here
+  // actions: actionId -> count of times that action was completed
+  customerProgress?: Record<string, {
+    points: number;              // Points awarded to this customer
+    actions: Record<string, number>; // actionId -> count of actions completed
+  }>;
   createdAt: string;
   updatedAt: string;
   stats: CampaignStats;
