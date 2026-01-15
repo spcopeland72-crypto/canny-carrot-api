@@ -91,7 +91,8 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
     for (const businessId of businessIds.slice(0, 100)) { // Limit to 100 to avoid timeout
       try {
         const business = await redis.getBusiness(businessId);
-        if (business && business.status === 'active') {
+        // Check for active status (case-insensitive: 'active', 'ACTIVE', 'Active')
+        if (business && business.status && business.status.toLowerCase() === 'active') {
           businesses.push(business);
         }
       } catch (error) {
@@ -146,7 +147,8 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
     for (const businessId of businessIds.slice(0, 100)) {
       try {
         const business = await redis.getBusiness(businessId);
-        if (!business || business.status !== 'active') continue;
+        // Check for active status (case-insensitive: 'active', 'ACTIVE', 'Active')
+        if (!business || !business.status || business.status.toLowerCase() !== 'active') continue;
 
         let fieldValue: string | undefined;
 
