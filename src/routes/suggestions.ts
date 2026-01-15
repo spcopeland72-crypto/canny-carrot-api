@@ -33,8 +33,12 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
   const query = (req.query.query as string) || '';
   const limit = parseInt(req.query.limit as string) || 10;
 
-  // Only fetch businesses when user has entered at least 2 characters
-  if (query.length < 2) {
+  const queryLower = query.toLowerCase().trim();
+  const suggestions: AutocompleteSuggestion[] = [];
+
+  // For businessName, require at least 2 characters
+  // For sector (fixed list), show all options if query is empty
+  if (fieldType === 'businessName' && query.length < 2) {
     return res.json({
       success: true,
       data: {
@@ -42,9 +46,6 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
       },
     });
   }
-
-  const queryLower = query.toLowerCase().trim();
-  const suggestions: AutocompleteSuggestion[] = [];
 
   if (fieldType === 'businessName') {
     // Get all business IDs from Redis
@@ -184,8 +185,41 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
         },
       };
     }));
+  } else if (fieldType === 'sector') {
+    // Use the same business types list as the customer/business registration form
+    // From Canny-carrot-website/src/pages/register.tsx
+    const businessTypes = [
+      'Cafe',
+      'Restaurant',
+      'Bakers',
+      'Butcher',
+      'Hairdresser',
+      'Boutique',
+      'Flower shop',
+      'Dog groomers',
+      'Window cleaner',
+      'Gardener',
+      'Other'
+    ];
+
+    // Filter business types that match the query
+    // If query is empty, show all types
+    const matchingTypes = businessTypes
+      .filter(type => {
+        if (!query || query.length === 0) return true;
+        const typeLower = type.toLowerCase();
+        return typeLower.includes(queryLower);
+      })
+      .map(type => ({
+        value: type,
+        label: type,
+        type: 'verified' as const,
+      }))
+      .slice(0, limit);
+
+    suggestions.push(...matchingTypes);
   } else {
-    // For other field types (sector, country, region, city, street),
+    // For other field types (country, region, city, street),
     // extract unique values from active businesses
     let businessIds: string[] = [];
     
@@ -209,20 +243,17 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
         let fieldValue: string | undefined;
 
         switch (fieldType) {
-          case 'sector':
-            fieldValue = business.category;
-            break;
           case 'country':
             fieldValue = 'United Kingdom'; // Default for Tees Valley businesses
             break;
           case 'region':
-            fieldValue = business.address.region;
+            fieldValue = business.address?.region || (business as any).profile?.region;
             break;
           case 'city':
-            fieldValue = business.address.city;
+            fieldValue = business.address?.city || (business as any).profile?.city;
             break;
           case 'street':
-            fieldValue = business.address.line1;
+            fieldValue = business.address?.line1 || (business as any).profile?.addressLine1 || (business as any).addressLine1;
             break;
         }
 
