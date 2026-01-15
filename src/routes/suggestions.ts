@@ -119,15 +119,31 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
       .slice(0, limit); // Limit results
 
     // Convert to AutocompleteSuggestion format
-    suggestions.push(...matchingBusinesses.map(business => ({
-      value: business.name,
-      label: business.name,
-      type: 'verified' as const,
-      metadata: {
-        businessId: business.id,
-        category: business.category,
-      },
-    })));
+    // Include address information in metadata so form can be populated
+    suggestions.push(...matchingBusinesses.map(business => {
+      // Handle both address structures: business.address or business.profile
+      // Some businesses have address nested in profile object
+      const businessAny = business as any;
+      const addressData: any = business.address || businessAny.profile?.address || businessAny.profile;
+      const address = addressData ? {
+        street: (addressData.line1 || addressData.addressLine1 || '').trim(),
+        city: (addressData.city || '').trim(),
+        region: (addressData.region || 'tees-valley').trim(),
+        postcode: (addressData.postcode || '').trim(),
+        country: (addressData.country || 'UK').trim(),
+      } : undefined;
+
+      return {
+        value: business.name,
+        label: business.name,
+        type: 'verified' as const,
+        metadata: {
+          businessId: business.id,
+          category: business.category,
+          address: address,
+        },
+      };
+    }));
   } else {
     // For other field types (sector, country, region, city, street),
     // extract unique values from active businesses
