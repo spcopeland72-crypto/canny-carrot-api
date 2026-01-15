@@ -121,16 +121,56 @@ router.get('/:fieldType', asyncHandler(async (req: Request, res: Response) => {
     // Convert to AutocompleteSuggestion format
     // Include address information in metadata so form can be populated
     suggestions.push(...matchingBusinesses.map(business => {
-      // Handle both address structures: business.address or business.profile
-      // Some businesses have address nested in profile object
+      // Handle multiple possible address structures:
+      // 1. business.address.line1 (standard structure)
+      // 2. business.addressLine1 (top-level fields)
+      // 3. business.profile.addressLine1 (profile structure)
       const businessAny = business as any;
-      const addressData: any = business.address || businessAny.profile?.address || businessAny.profile;
-      const address = addressData ? {
-        street: (addressData.line1 || addressData.addressLine1 || '').trim(),
-        city: (addressData.city || '').trim(),
-        region: (addressData.region || 'tees-valley').trim(),
-        postcode: (addressData.postcode || '').trim(),
-        country: (addressData.country || 'UK').trim(),
+      
+      // Extract address fields from various possible locations
+      const street = (
+        businessAny.address?.line1 || 
+        businessAny.address?.addressLine1 || 
+        businessAny.addressLine1 || 
+        businessAny.profile?.addressLine1 || 
+        ''
+      ).trim();
+      
+      const city = (
+        businessAny.address?.city || 
+        businessAny.city || 
+        businessAny.profile?.city || 
+        ''
+      ).trim();
+      
+      const region = (
+        businessAny.address?.region || 
+        businessAny.region || 
+        businessAny.profile?.region || 
+        'tees-valley'
+      ).trim();
+      
+      const postcode = (
+        businessAny.address?.postcode || 
+        businessAny.postcode || 
+        businessAny.profile?.postcode || 
+        ''
+      ).trim();
+      
+      const country = (
+        businessAny.address?.country || 
+        businessAny.country || 
+        businessAny.profile?.country || 
+        'UK'
+      ).trim();
+      
+      // Only include address if we have at least one field
+      const address = (street || city || postcode) ? {
+        street,
+        city,
+        region,
+        postcode,
+        country,
       } : undefined;
 
       return {
