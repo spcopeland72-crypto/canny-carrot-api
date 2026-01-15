@@ -2,18 +2,18 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { redis, REDIS_KEYS } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
-import { Member, ApiResponse } from '../types';
+import { Customer, ApiResponse } from '../types';
 
 const router = Router();
 
-// GET /api/v1/members - List all members (paginated)
+// GET /api/v1/customers - List all customers (paginated)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
   
   // In production, this would use Redis SCAN for pagination
   // For now, return a placeholder response
-  const response: ApiResponse<Member[]> = {
+  const response: ApiResponse<Customer[]> = {
     success: true,
     data: [],
     meta: { page, limit, total: 0 },
@@ -22,7 +22,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(response);
 }));
 
-// POST /api/v1/members - Create a new member
+// POST /api/v1/customers - Create a new customer
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const { email, phone, firstName, lastName, preferences } = req.body;
   
@@ -33,7 +33,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const id = uuidv4();
   const now = new Date().toISOString();
   
-  const member: Member = {
+  const customer: Customer = {
     id,
     email: email.toLowerCase(),
     phone,
@@ -50,58 +50,58 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   };
   
   // Store in Redis
-  await redis.setMember(id, member);
+  await redis.setCustomer(id, customer);
   
   // Also index by email for lookups
-  await redis.setMember(`email:${email.toLowerCase()}`, { memberId: id });
+  await redis.setCustomer(`email:${email.toLowerCase()}`, { customerId: id });
   
-  const response: ApiResponse<Member> = {
+  const response: ApiResponse<Customer> = {
     success: true,
-    data: member,
+    data: customer,
   };
   
   res.status(201).json(response);
 }));
 
-// GET /api/v1/members/:id - Get a specific member
+// GET /api/v1/customers/:id - Get a specific customer
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   
-  const member = await redis.getMember(id);
+  const customer = await redis.getCustomer(id);
   
-  if (!member) {
-    throw new ApiError(404, 'Member not found');
+  if (!customer) {
+    throw new ApiError(404, 'Customer not found');
   }
   
-  const response: ApiResponse<Member> = {
+  const response: ApiResponse<Customer> = {
     success: true,
-    data: member,
+    data: customer,
   };
   
   res.json(response);
 }));
 
-// PUT /api/v1/members/:id - Update a member
+// PUT /api/v1/customers/:id - Update a customer
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
   
-  const existing = await redis.getMember(id);
+  const existing = await redis.getCustomer(id);
   
   if (!existing) {
-    throw new ApiError(404, 'Member not found');
+    throw new ApiError(404, 'Customer not found');
   }
   
-  const updated: Member = {
+  const updated: Customer = {
     ...existing,
     ...updates,
     id, // Ensure ID can't be changed
     updatedAt: new Date().toISOString(),
   };
   
-  await redis.setMember(id, updated);
+  await redis.setCustomer(id, updated);
   
-  const response: ApiResponse<Member> = {
+  const response: ApiResponse<Customer> = {
     success: true,
     data: updated,
   };
@@ -109,15 +109,15 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json(response);
 }));
 
-// GET /api/v1/members/:id/stamps - Get member's stamps across all businesses
+// GET /api/v1/customers/:id/stamps - Get customer's stamps across all businesses
 router.get('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { businessId } = req.query;
   
-  const member = await redis.getMember(id);
+  const customer = await redis.getCustomer(id);
   
-  if (!member) {
-    throw new ApiError(404, 'Member not found');
+  if (!customer) {
+    throw new ApiError(404, 'Customer not found');
   }
   
   if (businessId) {
@@ -125,7 +125,7 @@ router.get('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
     return res.json({
       success: true,
       data: {
-        memberId: id,
+        customerId: id,
         businessId,
         stampCount: count,
       },
@@ -136,13 +136,13 @@ router.get('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
   res.json({
     success: true,
     data: {
-      memberId: id,
+      customerId: id,
       stamps: [],
     },
   });
 }));
 
-// POST /api/v1/members/:id/stamps - Add a stamp to a member's card
+// POST /api/v1/customers/:id/stamps - Add a stamp to a customer's card
 router.post('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { businessId, rewardId, method = 'qr' } = req.body;
@@ -151,10 +151,10 @@ router.post('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(400, 'Business ID is required');
   }
   
-  const member = await redis.getMember(id);
+  const customer = await redis.getCustomer(id);
   
-  if (!member) {
-    throw new ApiError(404, 'Member not found');
+  if (!customer) {
+    throw new ApiError(404, 'Customer not found');
   }
   
   // Add the stamp
@@ -167,17 +167,17 @@ router.post('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
   
   const newCount = await redis.addStamp(id, businessId, stampData);
   
-  // Update member's total stamps
-  await redis.setMember(id, {
-    ...member,
-    totalStamps: (member.totalStamps || 0) + 1,
+  // Update customer's total stamps
+  await redis.setCustomer(id, {
+    ...customer,
+    totalStamps: (customer.totalStamps || 0) + 1,
     updatedAt: new Date().toISOString(),
   });
   
   res.status(201).json({
     success: true,
     data: {
-      memberId: id,
+      customerId: id,
       businessId,
       stampCount: newCount,
       stamp: stampData,
@@ -186,23 +186,6 @@ router.post('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 export default router;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

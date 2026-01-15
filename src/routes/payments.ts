@@ -41,7 +41,7 @@ const PLANS = {
     ],
     limits: {
       rewards: 1,
-      members: 50,
+      customers: 50,
       campaigns: 0,
       notifications: 0,
     },
@@ -53,7 +53,7 @@ const PLANS = {
     interval: 'month',
     features: [
       '3 reward programs',
-      'Up to 500 members',
+      'Up to 500 customers',
       'Full analytics dashboard',
       'Email campaigns',
       'QR code scanning',
@@ -61,7 +61,7 @@ const PLANS = {
     ],
     limits: {
       rewards: 3,
-      members: 500,
+      customers: 500,
       campaigns: 3,
       notifications: 500,
     },
@@ -73,7 +73,7 @@ const PLANS = {
     interval: 'month',
     features: [
       'Unlimited reward programs',
-      'Unlimited members',
+      'Unlimited customers',
       'Advanced analytics',
       'Push notifications',
       'Geofencing campaigns',
@@ -82,7 +82,7 @@ const PLANS = {
     ],
     limits: {
       rewards: -1, // Unlimited
-      members: -1,
+      customers: -1,
       campaigns: -1,
       notifications: -1,
     },
@@ -103,7 +103,7 @@ const PLANS = {
     ],
     limits: {
       rewards: -1,
-      members: -1,
+      customers: -1,
       campaigns: -1,
       notifications: -1,
     },
@@ -297,7 +297,7 @@ router.get('/usage/:businessId', asyncHandler(async (req: Request, res: Response
   
   // Get current usage
   const business = await redis.getBusiness(businessId);
-  const memberCount = await redisClient.scard(`business:${businessId}:members`);
+  const customerCount = await redisClient.scard(`business:${businessId}:customers`);
   const rewardCount = await redisClient.scard(`business:${businessId}:rewards`);
   const campaignCount = await redisClient.scard(`business:${businessId}:campaigns`);
   
@@ -307,10 +307,10 @@ router.get('/usage/:businessId', asyncHandler(async (req: Request, res: Response
   const notificationCount = parseInt(await redisClient.get(`notifications:${businessId}:${monthKey}`) || '0');
   
   const usage = {
-    members: {
-      current: memberCount,
-      limit: plan.limits.members,
-      percentage: plan.limits.members === -1 ? 0 : (memberCount / plan.limits.members) * 100,
+    customers: {
+      current: customerCount,
+      limit: plan.limits.customers,
+      percentage: plan.limits.customers === -1 ? 0 : (customerCount / plan.limits.customers) * 100,
     },
     rewards: {
       current: rewardCount,
@@ -331,8 +331,8 @@ router.get('/usage/:businessId', asyncHandler(async (req: Request, res: Response
   
   // Check if any limits are exceeded
   const warnings: string[] = [];
-  if (usage.members.percentage >= 80 && plan.limits.members !== -1) {
-    warnings.push(`You're using ${Math.round(usage.members.percentage)}% of your member limit`);
+  if (usage.customers.percentage >= 80 && plan.limits.customers !== -1) {
+    warnings.push(`You're using ${Math.round(usage.customers.percentage)}% of your customer limit`);
   }
   if (usage.rewards.percentage >= 100 && plan.limits.rewards !== -1) {
     warnings.push('You\'ve reached your reward program limit');

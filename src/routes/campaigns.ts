@@ -258,26 +258,26 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 // Helper: Queue notifications for campaign
 async function queueNotifications(businessId: string, campaign: Campaign) {
-  const memberIds = await redisClient.smembers(REDIS_KEYS.businessMembers(businessId));
+  const customerIds = await redisClient.smembers(REDIS_KEYS.businessCustomers(businessId));
   
-  for (const memberId of memberIds) {
-    const member = await redis.getMember(memberId);
-    if (member && member.preferences?.notifications) {
+  for (const customerId of customerIds) {
+    const customer = await redis.getCustomer(customerId);
+    if (customer && customer.preferences?.notifications) {
       // Check target audience
       let shouldNotify = true;
       
       if (campaign.targetAudience === 'new') {
-        // Only new members (joined in last 30 days)
+        // Only new customers (joined in last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        shouldNotify = new Date(member.createdAt) > thirtyDaysAgo;
+        shouldNotify = new Date(customer.createdAt) > thirtyDaysAgo;
       } else if (campaign.targetAudience === 'returning') {
-        // Only returning members (more than 3 visits)
-        shouldNotify = (member.totalStamps || 0) >= 3;
+        // Only returning customers (more than 3 visits)
+        shouldNotify = (customer.totalStamps || 0) >= 3;
       } else if (campaign.targetAudience === 'inactive') {
         // Only inactive (no stamps in 30 days)
         const lastStamp = await redisClient.lindex(
-          REDIS_KEYS.memberStamps(memberId, businessId), 
+          REDIS_KEYS.customerStamps(customerId, businessId), 
           0
         );
         if (lastStamp) {
@@ -294,7 +294,7 @@ async function queueNotifications(businessId: string, campaign: Campaign) {
         // Queue notification
         await redisClient.lpush('notifications:queue', JSON.stringify({
           type: 'campaign',
-          memberId,
+          customerId,
           campaignId: campaign.id,
           businessId,
           title: campaign.name,
@@ -310,18 +310,18 @@ async function queueNotifications(businessId: string, campaign: Campaign) {
   }
 }
 
-// GET /api/v1/campaigns/active/member/:memberId
-// Get active campaigns relevant to a member
-router.get('/active/member/:memberId', asyncHandler(async (req: Request, res: Response) => {
-  const { memberId } = req.params;
+// GET /api/v1/campaigns/active/customer/:customerId
+// Get active campaigns relevant to a customer
+router.get('/active/customer/:customerId', asyncHandler(async (req: Request, res: Response) => {
+  const { customerId } = req.params;
   
-  const member = await redis.getMember(memberId);
-  if (!member) {
-    throw new ApiError(404, 'Member not found');
+  const customer = await redis.getCustomer(customerId);
+  if (!customer) {
+    throw new ApiError(404, 'Customer not found');
   }
   
-  // Get all businesses the member has visited
-  const businessIds = await redisClient.smembers(`member:${memberId}:businesses`);
+  // Get all businesses the customer has visited
+  const businessIds = await redisClient.smembers(`customer:${customerId}:businesses`);
   
   const activeCampaigns = [];
   

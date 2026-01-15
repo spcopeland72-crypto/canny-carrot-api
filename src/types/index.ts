@@ -1,6 +1,6 @@
 // Core Types for Canny Carrot Loyalty Platform
 
-export interface Member {
+export interface Customer {
   id: string;
   email: string;
   phone?: string;
@@ -11,7 +11,7 @@ export interface Member {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;            // Soft delete support
-  preferences: MemberPreferences;
+  preferences: CustomerPreferences;
   // Aggregated stats
   totalStamps: number;
   totalRedemptions: number;
@@ -29,7 +29,7 @@ export interface Member {
   }>;
 }
 
-export interface MemberPreferences {
+export interface CustomerPreferences {
   notifications: boolean;
   push?: boolean;
   email?: boolean;
@@ -58,6 +58,8 @@ export interface Business {
   status: 'active' | 'suspended' | 'cancelled';
   logo?: string;
   description?: string;
+  products?: string[];           // List of products created by this business
+  actions?: string[];            // List of actions created by this business
   createdAt: string;
   updatedAt: string;
   settings: BusinessSettings;
@@ -82,7 +84,7 @@ export interface BusinessSettings {
 }
 
 export interface BusinessStats {
-  totalMembers: number;
+  totalCustomers: number;
   totalStampsIssued: number;
   totalRedemptions: number;
   activeRewards: number;
@@ -112,20 +114,22 @@ export interface Reward {
   };
   maxRedemptions?: number;
   currentRedemptions: number;
+  // Customer progress tracking: customerId -> points collected
+  customerProgress?: Record<string, number>;  // Maps customerId to points earned
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Stamp {
   id: string;
-  memberId: string;
+  customerId: string;
   businessId: string;
   programId?: string;            // For multi-program support
   locationId?: string;           // Which location issued it
   rewardId: string;
   transactionId?: string;       // Link to unified Transaction
   issuedAt: string;
-  issuedBy: string; // Staff member ID or 'system'
+  issuedBy: string; // Staff customer ID or 'system'
   method: 'qr' | 'code' | 'nfc' | 'manual' | 'online' | 'pos' | 'receipt_scan';
   monetaryValue?: number;        // £ value of transaction
   orderId?: string;              // E-commerce order reference
@@ -135,7 +139,7 @@ export interface Stamp {
 
 export interface Redemption {
   id: string;
-  memberId: string;
+  customerId: string;
   businessId: string;
   rewardId: string;
   redeemedAt: string;
@@ -167,6 +171,8 @@ export interface Campaign {
     geo: boolean;
   };
   notificationMessage?: string;
+  // Customer progress tracking: customerId -> points collected
+  customerProgress?: Record<string, number>;  // Maps customerId to points earned
   createdAt: string;
   updatedAt: string;
   stats: CampaignStats;
@@ -210,8 +216,8 @@ export interface Notification {
   id: string;
   type: NotificationType;
   notificationType?: 'transactional' | 'marketing' | 'system'; // Align with GPT schema
-  memberId: string;
-  userId?: string;               // Alias for memberId
+  customerId: string;
+  userId?: string;               // Alias for customerId
   businessId?: string;
   campaignId?: string;
   title: string;
@@ -252,7 +258,7 @@ export interface Achievement {
 
 export interface LeaderboardEntry {
   rank: number;
-  memberId: string;
+  customerId: string;
   firstName: string;
   lastName: string;
   score: number;
@@ -305,7 +311,7 @@ export interface RegionalStats {
   };
   totals: {
     businesses: number;
-    members: number;
+    customers: number;
     stamps: number;
     redemptions: number;
     estimatedEconomicImpact: number; // £ value
@@ -334,7 +340,7 @@ export interface PaymentPlan {
   features: string[];
   limits: {
     rewards: number;
-    members: number;
+    customers: number;
     campaigns: number;
     notifications: number;
   };

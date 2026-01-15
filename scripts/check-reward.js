@@ -76,3 +76,5 @@ async function checkReward(rewardName) {
 const rewardName = process.argv[2] || 'Parmo';
 checkReward(rewardName);
 
+
+

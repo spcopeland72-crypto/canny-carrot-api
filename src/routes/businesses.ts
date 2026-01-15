@@ -75,7 +75,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       notificationsEnabled: true,
     },
     stats: {
-      totalMembers: 0,
+      totalCustomers: 0,
       totalStampsIssued: 0,
       totalRedemptions: 0,
       activeRewards: 0,
@@ -163,8 +163,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json(response);
 }));
 
-// GET /api/v1/businesses/:id/members - Get business's members
-router.get('/:id/members', asyncHandler(async (req: Request, res: Response) => {
+// GET /api/v1/businesses/:id/customers - Get business's customers
+router.get('/:id/customers', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
@@ -175,25 +175,25 @@ router.get('/:id/members', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
-  // Get member IDs from the set
-  const memberIds = await redisClient.smembers(REDIS_KEYS.businessMembers(id));
+  // Get customer IDs from the set
+  const customerIds = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
   
-  // Fetch member details (with pagination)
+  // Fetch customer details (with pagination)
   const start = (page - 1) * limit;
-  const paginatedIds = memberIds.slice(start, start + limit);
+  const paginatedIds = customerIds.slice(start, start + limit);
   
-  const members = await Promise.all(
-    paginatedIds.map(async (memberId) => {
-      const member = await redis.getMember(memberId);
-      const stampCount = await redis.getStampCount(memberId, id);
-      return { ...member, stampCount };
+  const customers = await Promise.all(
+    paginatedIds.map(async (customerId) => {
+      const customer = await redis.getCustomer(customerId);
+      const stampCount = await redis.getStampCount(customerId, id);
+      return { ...customer, stampCount };
     })
   );
   
   res.json({
     success: true,
-    data: members.filter(Boolean),
-    meta: { page, limit, total: memberIds.length },
+    data: customers.filter(Boolean),
+    meta: { page, limit, total: customerIds.length },
   });
 }));
 
@@ -216,7 +216,7 @@ router.get('/:id/stats', asyncHandler(async (req: Request, res: Response) => {
       period,
       ...business.stats,
       // Additional computed stats would go here
-      newMembersThisWeek: 0,
+      newCustomersThisWeek: 0,
       stampsThisWeek: 0,
       redemptionsThisWeek: 0,
       topReward: null,
