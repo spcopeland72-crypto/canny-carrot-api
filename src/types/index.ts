@@ -218,6 +218,16 @@ export interface CampaignConditions {
   daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
   startTime?: string; // HH:MM format
   endTime?: string;
+  // Business app specific: store reward data in conditions
+  rewardData?: {
+    selectedProducts?: string[];
+    selectedActions?: string[];
+    pinCode?: string;
+    qrCode?: string;
+    stampsRequired?: number;
+    pointsPerPurchase?: number;
+    rewardType?: 'free_product' | 'discount' | 'other';
+  };
 }
 
 export interface CampaignStats {
