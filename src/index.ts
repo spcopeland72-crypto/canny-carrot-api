@@ -23,6 +23,7 @@ import redisRoutes from './routes/redis'; // Redis proxy for mobile apps
 import authRoutes from './routes/auth'; // Authentication routes
 import suggestionsRoutes from './routes/suggestions'; // Autocomplete suggestions
 import userSubmissionsRoutes from './routes/userSubmissions'; // User submissions for admin review
+import searchRoutes from './routes/search'; // GeoSearch routes
 
 const app = express();
 
@@ -108,6 +109,7 @@ app.use('/api/v1/personalisation', personalisationRoutes); // AI personalization
 app.use('/api/v1/redis', redisRoutes); // Redis proxy for offline-first sync
 app.use('/api/v1/suggestions', suggestionsRoutes); // Autocomplete suggestions
 app.use('/api/v1/user-submissions', userSubmissionsRoutes); // User submissions for admin review
+app.use('/api/v1/search', searchRoutes); // GeoSearch routes
 console.log('✅ [INDEX] Registering auth routes at /api/v1/auth');
 console.log('✅ [INDEX] Auth routes type:', typeof authRoutes);
 app.use('/api/v1/auth', authRoutes); // Authentication routes
