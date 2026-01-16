@@ -150,6 +150,29 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
+  // VALIDATION: Flag missing fields that should always be present in BusinessProfile
+  const missingFields: string[] = [];
+  if (existing.products !== undefined && updates.products === undefined) {
+    missingFields.push('products');
+    console.error(`❌ [BUSINESSES] DATA LOSS: Business ${id} missing 'products' field. Existing had ${Array.isArray(existing.products) ? existing.products.length : 0} products.`);
+  }
+  if (existing.actions !== undefined && updates.actions === undefined) {
+    missingFields.push('actions');
+    console.error(`❌ [BUSINESSES] DATA LOSS: Business ${id} missing 'actions' field. Existing had ${Array.isArray(existing.actions) ? existing.actions.length : 0} actions.`);
+  }
+  if (existing.profile?.products !== undefined && updates.profile?.products === undefined && !updates.products) {
+    missingFields.push('profile.products');
+    console.error(`❌ [BUSINESSES] DATA LOSS: Business ${id} missing 'profile.products' field.`);
+  }
+  if (existing.profile?.actions !== undefined && updates.profile?.actions === undefined && !updates.actions) {
+    missingFields.push('profile.actions');
+    console.error(`❌ [BUSINESSES] DATA LOSS: Business ${id} missing 'profile.actions' field.`);
+  }
+  if (missingFields.length > 0) {
+    console.error(`❌ [BUSINESSES] CRITICAL: Missing fields that existed before: ${missingFields.join(', ')}`);
+    console.error(`❌ [BUSINESSES] This indicates data loss - app should send complete BusinessProfile with products/actions`);
+  }
+  
   // API is a transparent pipe - store exactly what app sends (full replacement)
   // App must send complete business record
   // CRITICAL: Do NOT merge - full replacement only
