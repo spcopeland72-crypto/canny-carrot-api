@@ -81,19 +81,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 // POST /api/v1/campaigns - Create a new campaign
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const {
-    businessId,
-    name,
-    description,
-    type,
-    startDate,
-    endDate,
-    targetAudience = 'all',
-    conditions = {},
-    notificationMessage,
-    bonusStamps,
-    discountPercent,
-  } = req.body;
+  // Accept full campaign object from client - API is a transparent forwarder
+  const { id, businessId, name } = req.body;
   
   // Capture client upload for debugging
   if (businessId) {
@@ -102,74 +91,101 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     );
   }
   
-  if (!businessId || !name || !type || !startDate || !endDate) {
-    throw new ApiError(400, 'Business ID, name, type, startDate, and endDate are required');
+  console.log('\n🥕 ============================================');
+  console.log('🥕 CAMPAIGN CREATION REQUEST');
+  console.log('🥕 ============================================');
+  console.log('📋 Campaign Name:', name);
+  console.log('📋 Business ID:', businessId);
+  console.log('📋 Campaign ID:', id);
+  console.log('🥕 ============================================\n');
+  
+  if (!businessId || !name) {
+    console.error('❌ [CAMPAIGNS] Missing required fields:', { businessId: !!businessId, name: !!name });
+    throw new ApiError(400, 'Business ID and name are mandatory');
   }
   
-  // Validate business exists
+  // Verify business exists
   const business = await redis.getBusiness(businessId);
   if (!business) {
     throw new ApiError(404, 'Business not found');
   }
   
-  const id = uuidv4();
+  // Use provided ID if valid, otherwise generate new one
+  // This allows app to sync campaigns with existing IDs
+  const campaignId = id && typeof id === 'string' && id.length > 0 ? id : uuidv4();
   const now = new Date().toISOString();
   
-  const campaign: Campaign = {
-    id,
+  // Check if campaign with this ID already exists (for idempotency)
+  const existingCampaignData = await redisClient.get(REDIS_KEYS.campaign(campaignId));
+  if (existingCampaignData) {
+    // Campaign exists - merge with existing, preserving all fields
+    const existingCampaign = JSON.parse(existingCampaignData);
+    // API is a transparent forwarder - preserve updatedAt from request, or keep existing
+    // Do NOT auto-update timestamps - app manages timestamps
+    const updatedCampaign: any = {
+      ...existingCampaign, // Preserve all existing fields
+      ...req.body, // Update with new values from request (includes updatedAt if provided)
+      id: campaignId, // Ensure ID can't be changed
+      businessId: existingCampaign.businessId, // Ensure business can't be changed
+      updatedAt: req.body.updatedAt !== undefined ? req.body.updatedAt : existingCampaign.updatedAt, // Preserve from request or existing
+    };
+    
+    await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(updatedCampaign));
+    
+    // Ensure it's in the business campaigns set
+    await redisClient.sadd(`business:${businessId}:campaigns`, campaignId);
+    
+    // API is a transparent forwarder - does not modify business.updatedAt
+    // App is responsible for updating business profile timestamp when syncing
+    
+    // Save repository copy when campaign is updated
+    saveEntityCopy(businessId, 'campaign', campaignId).catch(err => {
+      console.error('[CAMPAIGNS] Error saving repository copy:', err);
+    });
+    
+    return res.json({
+      success: true,
+      data: updatedCampaign,
+    });
+  }
+  
+  // API is a transparent forwarder - use request body as-is, only set defaults for required fields
+  // Do NOT auto-update timestamps - app manages timestamps
+  const campaign: any = {
+    ...req.body, // Include ALL fields from request (conditions.rewardData, selectedProducts, pinCode, qrCode, timestamps, etc.)
+    id: campaignId,
     businessId,
-    name,
-    description: description || '',
-    type, // 'double_stamps' | 'bonus_reward' | 'flash_sale' | 'referral' | 'birthday'
-    startDate,
-    endDate,
-    status: new Date(startDate) > new Date() ? 'scheduled' : 'active',
-    targetAudience,
-    conditions: {
-      ...conditions,
-      bonusStamps,
-      discountPercent,
-    },
-    notificationMessage,
-    createdAt: now,
-    updatedAt: now,
-    stats: {
-      impressions: 0,
-      clicks: 0,
-      conversions: 0,
-    },
+    createdAt: req.body.createdAt || now, // Only set if not provided
+    updatedAt: req.body.updatedAt || now, // Only set if not provided
+    currentRedemptions: req.body.currentRedemptions !== undefined ? req.body.currentRedemptions : 0,
+    isActive: req.body.isActive !== undefined ? req.body.isActive : true,
   };
   
-  // Store campaign
-  await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(campaign));
+    // Store campaign
+    await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(campaign));
+    
+    // Capture what was saved to Redis for debugging
+    captureClientUpload('campaign', businessId, campaign).catch(err => 
+      console.error('[DEBUG] Error capturing saved campaign:', err)
+    );
+    
+    // Add to business's campaign set
+    await redisClient.sadd(`business:${businessId}:campaigns`, campaignId);
   
-  // Capture what was saved to Redis for debugging
-  captureClientUpload('campaign', businessId, campaign).catch(err => 
-    console.error('[DEBUG] Error capturing saved campaign:', err)
-  );
-  
-  // Add to business's campaign list
-  await redisClient.sadd(`business:${businessId}:campaigns`, id);
-  
-  // If scheduled, add to scheduler queue
-  if (campaign.status === 'scheduled') {
-    await redisClient.zadd('campaigns:scheduled', new Date(startDate).getTime(), id);
-  }
-  
-  // If active and has notification, queue for sending
-  if (campaign.status === 'active' && notificationMessage) {
-    await queueNotifications(businessId, campaign);
-  }
-  
-  // Save repository copy when campaign is created
-  saveEntityCopy(businessId, 'campaign', id).catch(err => {
-    console.error('[CAMPAIGNS] Error saving repository copy:', err);
-  });
-  
-  res.status(201).json({
-    success: true,
-    data: campaign,
-  });
+    // API is a transparent forwarder - does not modify business stats or timestamps
+    // App is responsible for updating business profile and stats when syncing
+    
+    // Save repository copy when campaign is created
+    saveEntityCopy(businessId, 'campaign', campaignId).catch(err => {
+      console.error('[CAMPAIGNS] Error saving repository copy:', err);
+    });
+    
+    const response: ApiResponse<any> = {
+      success: true,
+      data: campaign,
+    };
+    
+    res.status(201).json(response);
 }));
 
 // PUT /api/v1/campaigns/:id
