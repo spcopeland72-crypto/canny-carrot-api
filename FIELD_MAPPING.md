@@ -13,40 +13,55 @@ This document maps all form-collected fields against API expected fields to iden
 - `logo` - Business logo (base64 or URI)
 - `logoIcon` - Circular icon version (generated)
 
-**NOT Collected by Form:**
-- `products` - Array of product names
-- `actions` - Array of action names
-- `addressLine2`, `city`, `postcode`, `country` - Address components (only `address` collected)
-- `website`, `socialMedia` - Not in form
-- `description`, `category`, `companyNumber` - Not in form
+**NOT Collected by Form (but part of BusinessProfile):**
+- `products` - Array of product names (should be preserved from existingProfile)
+- `actions` - Array of action names (should be preserved from existingProfile)
+- `addressLine2`, `city`, `postcode`, `country` - Address components (should be preserved from existingProfile)
+- `website`, `socialMedia` - Should be preserved from existingProfile
+- `description`, `category`, `companyNumber` - Should be preserved from existingProfile
 
 ### Save Logic (BusinessProfilePage.tsx:249-260)
 ```typescript
 const updatedProfile: BusinessProfile = {
   id: businessId,
-  name: businessName,
-  email: email,
-  phone: phone,
-  address: address,
-  logo: logo || undefined,
-  logoIcon: logoIcon || undefined,
-  ...existingProfile, // Preserves products/actions from existing profile
+  name: businessName,        // From form
+  email: email,              // From form
+  phone: phone,              // From form
+  address: address,          // From form
+  logo: logo || undefined,   // From form
+  logoIcon: logoIcon || undefined, // From form
+  ...existingProfile,        // Preserves: products, actions, addressLine1/2, city, postcode, country, website, socialMedia, description, category, companyNumber
   updatedAt: new Date().toISOString(),
   createdAt: existingProfile?.createdAt || new Date().toISOString(),
 };
 ```
 
 **Analysis:**
-- Form preserves `products` and `actions` via `...existingProfile` spread (LOCALLY)
-- BUT when `businessRepository.save()` sends to API, it sends `updatedProfile` which should include products/actions
-- **ROOT CAUSE:** API does full replacement `{...updates}`, so if the profile sent doesn't have products (shouldn't happen if spread works), they're lost
+- ✅ Form SHOULD preserve `products` and `actions` via `...existingProfile` spread
+- ✅ `businessRepository.save()` sends `profile` which should include products/actions from spread
+- ⚠️ **ISSUE:** If `existingProfile` from local storage is missing `products`/`actions`, they won't be preserved
+- ⚠️ **API FULL REPLACEMENT:** API stores exactly what it receives - if `products`/`actions` are missing from request, they're lost
 
 ### API Expected Fields (Business PUT)
-**Expected (from existing data):**
-- `products` - Array (should always be present, even if empty)
-- `profile.products` - Nested products (may also exist)
+**Expected (from BusinessProfile type - should always be present):**
+- `products` - Array of product names (part of BusinessProfile, should be preserved from existingProfile)
+- `actions` - Array of action names (part of BusinessProfile, should be preserved from existingProfile)
 
-**Issue:** Form doesn't collect `products`, so they're missing when business profile is saved, causing data loss.
+**API Validation (businesses.ts:156-160):**
+```typescript
+// API does full replacement - stores exactly what app sends
+const updated: Business = {
+  ...updates, // Complete business profile from app (should include products/actions)
+  id,
+  updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : existing.updatedAt,
+};
+```
+
+**Issue Identified:**
+1. ✅ Form preserves `products`/`actions` via `...existingProfile` spread
+2. ⚠️ If `existingProfile` from local storage doesn't have `products`/`actions`, they're missing
+3. ⚠️ API does full replacement - if `products`/`actions` are missing from request, they're lost
+4. ⚠️ **ROOT CAUSE:** Products/actions might be missing from local `existingProfile`, so spread doesn't preserve them
 
 ---
 
