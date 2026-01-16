@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { config } from './config/env';
 import { redisClient, connectRedis } from './config/redis';
 import { errorHandler } from './middleware/errorHandler';
+import { apiLogger } from './middleware/apiLogger';
 import { initializeRepositoryCopies } from './services/repositoryCopyService';
 
 // Routes
@@ -34,6 +35,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+
+// Comprehensive API Logger - captures ALL requests and responses to /tmp for Vercel access
+app.use(apiLogger);
 
 // Debug middleware to see what paths Express receives
 app.use((req, res, next) => {
