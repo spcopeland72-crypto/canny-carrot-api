@@ -4,6 +4,7 @@ import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Business, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
+import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
 
 const router = Router();
 
@@ -120,6 +121,11 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
+  // Capture server download for debugging
+  captureServerDownload('business', id, business).catch(err => 
+    console.error('[DEBUG] Error capturing server download:', err)
+  );
+  
   const response: ApiResponse<Business> = {
     success: true,
     data: business,
@@ -132,6 +138,11 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
+  
+  // Capture client upload for debugging
+  captureClientUpload('business', id, req.body).catch(err => 
+    console.error('[DEBUG] Error capturing client upload:', err)
+  );
   
   const existing = await redis.getBusiness(id);
   
@@ -149,6 +160,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redis.setBusiness(id, updated);
+  
+  // Capture what was saved to Redis for debugging
+  captureClientUpload('business', id, updated).catch(err => 
+    console.error('[DEBUG] Error capturing saved business:', err)
+  );
   
   // Save repository copy when business profile is updated
   saveEntityCopy(id, 'business').catch(err => {

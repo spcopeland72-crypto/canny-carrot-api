@@ -4,6 +4,7 @@ import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Campaign } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
+import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
 
 const router = Router();
 
@@ -33,6 +34,11 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   // Sort by start date descending
   filteredCampaigns.sort((a, b) => 
     new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+  );
+  
+  // Capture server download for debugging
+  captureServerDownload('campaigns', businessId as string, filteredCampaigns).catch(err => 
+    console.error('[DEBUG] Error capturing server download:', err)
   );
   
   res.json({
@@ -89,6 +95,13 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     discountPercent,
   } = req.body;
   
+  // Capture client upload for debugging
+  if (businessId) {
+    captureClientUpload('campaign', businessId, req.body).catch(err => 
+      console.error('[DEBUG] Error capturing client upload:', err)
+    );
+  }
+  
   if (!businessId || !name || !type || !startDate || !endDate) {
     throw new ApiError(400, 'Business ID, name, type, startDate, and endDate are required');
   }
@@ -130,6 +143,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Store campaign
   await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(campaign));
   
+  // Capture what was saved to Redis for debugging
+  captureClientUpload('campaign', businessId, campaign).catch(err => 
+    console.error('[DEBUG] Error capturing saved campaign:', err)
+  );
+  
   // Add to business's campaign list
   await redisClient.sadd(`business:${businessId}:campaigns`, id);
   
@@ -166,6 +184,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   
   const campaign = JSON.parse(data);
   
+  // Capture client upload for debugging
+  captureClientUpload('campaign', campaign.businessId, req.body).catch(err => 
+    console.error('[DEBUG] Error capturing client upload:', err)
+  );
+  
   // Can't update completed campaigns
   if (campaign.status === 'completed') {
     throw new ApiError(400, 'Cannot update completed campaigns');
@@ -180,6 +203,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(updatedCampaign));
+  
+  // Capture what was saved to Redis for debugging
+  captureClientUpload('campaign', campaign.businessId, updatedCampaign).catch(err => 
+    console.error('[DEBUG] Error capturing saved campaign:', err)
+  );
   
   // Save repository copy when campaign is updated
   saveEntityCopy(campaign.businessId, 'campaign', id).catch(err => {

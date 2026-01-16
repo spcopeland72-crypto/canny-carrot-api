@@ -1,0 +1,187 @@
+{
+  "businessId": "business_1767744076082_i3d1uu42x",
+  "timestamp": "2026-01-15T23:42:12.502Z",
+  "business": {
+    "profile": {
+      "id": "business_1767744076082_i3d1uu42x",
+      "name": "The Stables",
+      "email": "laverickclare@hotmail.com",
+      "phone": "07969378747",
+      "contactName": "Clare Langley",
+      "addressLine1": "7 Elderberry Close",
+      "addressLine2": "",
+      "city": "",
+      "postcode": "TS22 5US",
+      "country": "UK",
+      "businessType": "Pub",
+      "category": "Free Item",
+      "description": "Public house",
+      "website": "https://cannycarrot.com",
+      "socialMedia": {
+        "facebook": "canny_carrot_rewards",
+        "instagram": "canny_carrot_rewards",
+        "twitter": "canny_carrot_rewards",
+        "tiktok": "",
+        "linkedin": ""
+      },
+      "teamSize": "7",
+      "CRMIntegration": false,
+      "notificationsOptIn": true,
+      "createdAt": "2026-01-07T00:01:16.080Z",
+      "updatedAt": "2026-01-07T00:01:16.080Z"
+    },
+    "subscriptionTier": "gold",
+    "status": "ACTIVE",
+    "joinDate": "2026-01-07T00:01:16.080Z",
+    "onboardingCompleted": false,
+    "rewards": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "campaigns": {
+      "live": [],
+      "draft": [],
+      "archived": []
+    },
+    "customerCount": 0,
+    "totalScans": 0,
+    "updatedAt": "2026-01-15T19:24:44.839Z",
+    "id": "business_1767744076082_i3d1uu42x",
+    "name": "The Stables",
+    "email": "laverickclare@hotmail.com",
+    "phone": "07969378747",
+    "addressLine1": "7 Elderberry Close",
+    "addressLine2": "",
+    "city": "",
+    "postcode": "TS22 5US",
+    "country": "UK",
+    "website": "https://cannycarrot.com",
+    "socialMedia": {
+      "facebook": "canny_carrot_rewards",
+      "instagram": "canny_carrot_rewards",
+      "twitter": "canny_carrot_rewards",
+      "tiktok": "",
+      "linkedin": ""
+    },
+    "category": "Free Item",
+    "description": "Public house",
+    "createdAt": "2026-01-07T00:01:16.080Z",
+    "products": [
+      "Mississippi mud pie",
+      "Cheesecake",
+      "Fish and chips",
+      "Parmo grande",
+      "Steak and fries"
+    ]
+  },
+  "rewards": [
+    {
+      "id": "1768182162160",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "Parmo Heaven",
+      "description": "",
+      "stampsRequired": 5,
+      "costStamps": 5,
+      "type": "freebie",
+      "isActive": true,
+      "validFrom": "2026-01-12T21:37:52.750Z",
+      "createdAt": "2026-01-12T01:42:42.160Z",
+      "updatedAt": "2026-01-12T21:37:52.750Z",
+      "currentRedemptions": 0,
+      "pinCode": "1234",
+      "qrCode": "REWARD:1768182162160:Parmo Heaven:5:free_product:Clare's Parmo:1234",
+      "selectedProducts": [
+        "Clare's Parmo"
+      ],
+      "pointsPerPurchase": 1
+    },
+    {
+      "id": "1768182203709",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "Mud Galore",
+      "description": "",
+      "stampsRequired": 4,
+      "costStamps": 4,
+      "type": "freebie",
+      "isActive": true,
+      "validFrom": "2026-01-12T01:43:23.709Z",
+      "createdAt": "2026-01-12T01:43:23.709Z",
+      "updatedAt": "2026-01-12T01:43:23.709Z",
+      "currentRedemptions": 0,
+      "pinCode": "2345",
+      "qrCode": "REWARD:1768182203709:Mud Galore:4:free_product:Mississippi mud pie:2345",
+      "selectedProducts": [
+        "Mississippi mud pie"
+      ],
+      "pointsPerPurchase": 1
+    },
+    {
+      "id": "1768182237319",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "Cheesy please",
+      "description": "",
+      "stampsRequired": 5,
+      "costStamps": 5,
+      "type": "freebie",
+      "isActive": true,
+      "validFrom": "2026-01-15T19:23:33.131Z",
+      "createdAt": "2026-01-12T01:43:57.320Z",
+      "updatedAt": "2026-01-15T19:23:33.131Z",
+      "currentRedemptions": 0,
+      "pinCode": "3456",
+      "qrCode": "REWARD:1768182237319:Cheesy please:5:free_product:Cheesecake:3456",
+      "selectedProducts": [
+        "Cheesecake"
+      ],
+      "pointsPerPurchase": 1
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "d6029b3f-9f3b-4540-8411-de4aa9c2aae6",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "Stables bingo",
+      "description": "",
+      "type": "bonus_reward",
+      "startDate": "2026-01-15T19:24:44.838Z",
+      "endDate": "2027-01-15T19:24:44.838Z",
+      "status": "active",
+      "targetAudience": "all",
+      "conditions": {},
+      "createdAt": "2026-01-15T22:41:04.037Z",
+      "updatedAt": "2026-01-15T22:41:04.037Z",
+      "stats": {
+        "impressions": 0,
+        "clicks": 0,
+        "conversions": 0
+      }
+    },
+    {
+      "id": "2063cc59-3c7c-4054-9d94-b17aa0ec80fd",
+      "businessId": "business_1767744076082_i3d1uu42x",
+      "name": "Stables bingo",
+      "description": "",
+      "type": "bonus_reward",
+      "startDate": "2026-01-15T19:24:44.838Z",
+      "endDate": "2027-01-15T19:24:44.838Z",
+      "status": "active",
+      "targetAudience": "all",
+      "conditions": {},
+      "createdAt": "2026-01-15T22:41:04.098Z",
+      "updatedAt": "2026-01-15T22:41:04.098Z",
+      "stats": {
+        "impressions": 0,
+        "clicks": 0,
+        "conversions": 0
+      }
+    }
+  ],
+  "customers": [],
+  "auth": {
+    "email": "laverickclare@hotmail.com",
+    "passwordHash": "$2a$10$7b.lvy77EmnHjI.MW4Zz6Ot71UBtShLQ3XE2mjYF.LOqV2luC9tOW",
+    "businessId": "business_1767744076082_i3d1uu42x",
+    "createdAt": "2026-01-07T00:01:17.177Z"
+  }
+}

@@ -4,6 +4,7 @@ import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Reward, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
+import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
 
 const router = Router();
 
@@ -28,6 +29,11 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       filteredRewards = filteredRewards.filter((r: Reward) => r.isActive);
     }
     
+    // Capture server download for debugging
+    captureServerDownload('rewards', businessId as string, filteredRewards).catch(err => 
+      console.error('[DEBUG] Error capturing server download:', err)
+    );
+    
     return res.json({
       success: true,
       data: filteredRewards,
@@ -44,6 +50,13 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Accept full reward object from client - API is a transparent forwarder
   const { id, businessId, name, stampsRequired } = req.body;
+  
+  // Capture client upload for debugging
+  if (businessId) {
+    captureClientUpload('reward', businessId, req.body).catch(err => 
+      console.error('[DEBUG] Error capturing client upload:', err)
+    );
+  }
   
   console.log('\n🥕 ============================================');
   console.log('🥕 REWARD CREATION REQUEST');
@@ -116,11 +129,16 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     isActive: req.body.isActive !== undefined ? req.body.isActive : true,
   };
   
-  // Store reward
-  await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(reward));
-  
-  // Add to business's reward set
-  await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), rewardId);
+    // Store reward
+    await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(reward));
+    
+    // Capture what was saved to Redis for debugging
+    captureClientUpload('reward', businessId, reward).catch(err => 
+      console.error('[DEBUG] Error capturing saved reward:', err)
+    );
+    
+    // Add to business's reward set
+    await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), rewardId);
   
     // API is a transparent forwarder - does not modify business stats or timestamps
     // App is responsible for updating business profile and stats when syncing
@@ -163,7 +181,14 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
   
+  // Capture client upload for debugging
   const data = await redisClient.get(REDIS_KEYS.reward(id));
+  if (data) {
+    const existing = JSON.parse(data);
+    captureClientUpload('reward', existing.businessId, req.body).catch(err => 
+      console.error('[DEBUG] Error capturing client upload:', err)
+    );
+  }
   
   if (!data) {
     throw new ApiError(404, 'Reward not found');
@@ -179,6 +204,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   };
   
   await redisClient.set(REDIS_KEYS.reward(id), JSON.stringify(updated));
+  
+  // Capture what was saved to Redis for debugging
+  captureClientUpload('reward', existing.businessId, updated).catch(err => 
+    console.error('[DEBUG] Error capturing saved reward:', err)
+  );
   
   // Save repository copy when reward is updated via PUT
   saveEntityCopy(existing.businessId, 'reward', id).catch(err => {
