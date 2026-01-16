@@ -34,53 +34,26 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /api/v1/businesses - Register a new business
+// API is transparent pipe - accepts whatever app sends, no validation, no requirements
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, phone, address, category, bidId, logo, description } = req.body;
+  // Accept full business object from client - API is a transparent forwarder
+  // API has no role in data accuracy - forms/app UI mandate dataset
+  const businessData = req.body;
   
-  if (!name || !email || !address) {
-    throw new ApiError(400, 'Name, email, and address are required');
-  }
-  
-  // Validate address is in Tees Valley
-  const validCities = ['middlesbrough', 'stockton', 'stockton-on-tees', 'darlington', 'hartlepool', 'redcar'];
-  const cityLower = address.city?.toLowerCase();
-  if (!validCities.some(c => cityLower?.includes(c))) {
-    // Warning but don't block - might expand later
-    console.warn(`Business ${name} registered outside core Tees Valley area: ${address.city}`);
-  }
-  
-  const id = uuidv4();
-  const slug = createSlug(name);
+  // Use provided ID if valid, otherwise generate new one
+  const id = businessData.id && typeof businessData.id === 'string' && businessData.id.length > 0 
+    ? businessData.id 
+    : uuidv4();
+  const slug = businessData.slug || (businessData.name ? createSlug(businessData.name) : `business-${id}`);
   const now = new Date().toISOString();
   
-  const business: Business = {
+  // API is transparent pipe - store exactly what app sends
+  const business: any = {
+    ...businessData, // Include ALL fields from request
     id,
-    name,
     slug,
-    email: email.toLowerCase(),
-    phone,
-    address: {
-      ...address,
-      region: 'tees-valley',
-    },
-    category: category || 'other',
-    bidId,
-    status: 'active',
-    logo,
-    description,
-    createdAt: now,
-    updatedAt: now,
-    settings: {
-      stampValidationMethod: 'qr',
-      autoRewardEnabled: true,
-      notificationsEnabled: true,
-    },
-    stats: {
-      totalCustomers: 0,
-      totalStampsIssued: 0,
-      totalRedemptions: 0,
-      activeRewards: 0,
-    },
+    createdAt: businessData.createdAt || now,
+    updatedAt: businessData.updatedAt || now,
   };
   
   // Store in Redis
@@ -90,8 +63,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   await redisClient.set(REDIS_KEYS.businessBySlug(slug), id);
   
   // Add to BID if specified
-  if (bidId) {
-    await redisClient.sadd(REDIS_KEYS.bidBusinesses(bidId), id);
+  if (businessData.bidId) {
+    await redisClient.sadd(REDIS_KEYS.bidBusinesses(businessData.bidId), id);
   }
   
   const response: ApiResponse<Business> = {

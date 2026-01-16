@@ -58,25 +58,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     );
   }
   
-  console.log('\n🥕 ============================================');
-  console.log('🥕 REWARD CREATION REQUEST');
-  console.log('🥕 ============================================');
-  console.log('📋 Reward Name:', name);
-  console.log('📋 Business ID:', businessId);
-  console.log('📋 Reward ID:', id);
-  console.log('📋 Stamps Required:', stampsRequired);
-  console.log('🥕 ============================================\n');
-  
-  if (!businessId || !name || !stampsRequired) {
-    console.error('❌ [REWARDS] Missing required fields:', { businessId: !!businessId, name: !!name, stampsRequired: !!stampsRequired });
-    throw new ApiError(400, 'Business ID, name, and stamps required are mandatory');
-  }
-  
-  // Verify business exists
-  const business = await redis.getBusiness(businessId);
-  if (!business) {
-    throw new ApiError(404, 'Business not found');
-  }
+  // API is transparent pipe - no validation, no requirements
+  // Forms/app UI mandate dataset - API just passes data through
   
   // Use provided ID if valid, otherwise generate new one
   // This allows app to sync rewards with existing IDs
@@ -86,13 +69,37 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Check if reward with this ID already exists (for idempotency)
   const existingRewardData = await redisClient.get(REDIS_KEYS.reward(rewardId));
   if (existingRewardData) {
+    // VALIDATION: Flag missing fields that should always be present
+    const existingReward = JSON.parse(existingRewardData);
+    const missingFields: string[] = [];
+    if (existingReward.pinCode && !req.body.pinCode) {
+      missingFields.push('pinCode');
+      console.error(`❌ [REWARDS] DATA LOSS: Reward ${rewardId} missing 'pinCode' field. Existing had: ${existingReward.pinCode}`);
+    }
+    if (existingReward.qrCode && !req.body.qrCode) {
+      missingFields.push('qrCode');
+      console.error(`❌ [REWARDS] DATA LOSS: Reward ${rewardId} missing 'qrCode' field.`);
+    }
+    if (existingReward.selectedProducts && Array.isArray(existingReward.selectedProducts) && existingReward.selectedProducts.length > 0 && !req.body.selectedProducts) {
+      missingFields.push('selectedProducts');
+      console.error(`❌ [REWARDS] DATA LOSS: Reward ${rewardId} missing 'selectedProducts' field. Existing had: ${existingReward.selectedProducts.join(', ')}`);
+    }
+    if (existingReward.selectedActions && Array.isArray(existingReward.selectedActions) && existingReward.selectedActions.length > 0 && !req.body.selectedActions) {
+      missingFields.push('selectedActions');
+      console.error(`❌ [REWARDS] DATA LOSS: Reward ${rewardId} missing 'selectedActions' field. Existing had: ${existingReward.selectedActions.join(', ')}`);
+    }
+    if (missingFields.length > 0) {
+      console.error(`❌ [REWARDS] CRITICAL: Missing fields that existed before: ${missingFields.join(', ')}`);
+      console.error(`❌ [REWARDS] This indicates data loss - app should send complete record`);
+    }
+    
     // Reward exists - API is transparent pipe, store exactly what app sends (full replacement)
     // App must send complete reward record
     const reward: any = {
       ...req.body, // Include ALL fields from request (complete record)
       id: rewardId, // Ensure ID can't be changed
-      businessId: existingRewardData ? JSON.parse(existingRewardData).businessId : businessId, // Preserve businessId
-      createdAt: req.body.createdAt || JSON.parse(existingRewardData).createdAt || now, // Preserve or use provided
+      businessId: existingReward.businessId || businessId, // Preserve businessId
+      createdAt: req.body.createdAt || existingReward.createdAt || now, // Preserve or use provided
       updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
     

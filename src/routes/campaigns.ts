@@ -91,24 +91,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     );
   }
   
-  console.log('\n🥕 ============================================');
-  console.log('🥕 CAMPAIGN CREATION REQUEST');
-  console.log('🥕 ============================================');
-  console.log('📋 Campaign Name:', name);
-  console.log('📋 Business ID:', businessId);
-  console.log('📋 Campaign ID:', id);
-  console.log('🥕 ============================================\n');
-  
-  if (!businessId || !name) {
-    console.error('❌ [CAMPAIGNS] Missing required fields:', { businessId: !!businessId, name: !!name });
-    throw new ApiError(400, 'Business ID and name are mandatory');
-  }
-  
-  // Verify business exists
-  const business = await redis.getBusiness(businessId);
-  if (!business) {
-    throw new ApiError(404, 'Business not found');
-  }
+  // API is transparent pipe - no validation, no requirements
+  // Forms/app UI mandate dataset - API just passes data through
   
   // Use provided ID if valid, otherwise generate new one
   // This allows app to sync campaigns with existing IDs
@@ -118,13 +102,29 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Check if campaign with this ID already exists (for idempotency)
   const existingCampaignData = await redisClient.get(REDIS_KEYS.campaign(campaignId));
   if (existingCampaignData) {
+    // VALIDATION: Flag missing fields that should always be present
+    const existingCampaign = JSON.parse(existingCampaignData);
+    const missingFields: string[] = [];
+    if (existingCampaign.conditions && !req.body.conditions) {
+      missingFields.push('conditions');
+      console.error(`❌ [CAMPAIGNS] DATA LOSS: Campaign ${campaignId} missing 'conditions' field. Existing had:`, JSON.stringify(existingCampaign.conditions).substring(0, 200));
+    }
+    if (existingCampaign.conditions?.rewardData && (!req.body.conditions || !req.body.conditions.rewardData)) {
+      missingFields.push('conditions.rewardData');
+      console.error(`❌ [CAMPAIGNS] DATA LOSS: Campaign ${campaignId} missing 'conditions.rewardData'. Existing had selectedProducts/selectedActions/pinCode/qrCode.`);
+    }
+    if (missingFields.length > 0) {
+      console.error(`❌ [CAMPAIGNS] CRITICAL: Missing fields that existed before: ${missingFields.join(', ')}`);
+      console.error(`❌ [CAMPAIGNS] This indicates data loss - app should send complete record`);
+    }
+    
     // Campaign exists - API is transparent pipe, store exactly what app sends (full replacement)
     // App must send complete campaign record
     const campaign: any = {
       ...req.body, // Include ALL fields from request (complete record)
       id: campaignId, // Ensure ID can't be changed
-      businessId: existingCampaignData ? JSON.parse(existingCampaignData).businessId : businessId, // Preserve businessId
-      createdAt: req.body.createdAt || JSON.parse(existingCampaignData).createdAt || now, // Preserve or use provided
+      businessId: existingCampaign.businessId || businessId, // Preserve businessId
+      createdAt: req.body.createdAt || existingCampaign.createdAt || now, // Preserve or use provided
       updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
     
