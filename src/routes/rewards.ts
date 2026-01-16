@@ -86,19 +86,17 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Check if reward with this ID already exists (for idempotency)
   const existingRewardData = await redisClient.get(REDIS_KEYS.reward(rewardId));
   if (existingRewardData) {
-    // Reward exists - merge with existing, preserving all fields
-    const existingReward = JSON.parse(existingRewardData);
-    // API is a transparent forwarder - preserve updatedAt from request, or keep existing
-    // Do NOT auto-update timestamps - app manages timestamps
-    const updatedReward: any = {
-      ...existingReward, // Preserve all existing fields
-      ...req.body, // Update with new values from request (includes updatedAt if provided)
+    // Reward exists - API is transparent pipe, store exactly what app sends (full replacement)
+    // App must send complete reward record
+    const reward: any = {
+      ...req.body, // Include ALL fields from request (complete record)
       id: rewardId, // Ensure ID can't be changed
-      businessId: existingReward.businessId, // Ensure business can't be changed
-      updatedAt: req.body.updatedAt !== undefined ? req.body.updatedAt : existingReward.updatedAt, // Preserve from request or existing
+      businessId: existingRewardData ? JSON.parse(existingRewardData).businessId : businessId, // Preserve businessId
+      createdAt: req.body.createdAt || JSON.parse(existingRewardData).createdAt || now, // Preserve or use provided
+      updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
     
-    await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(updatedReward));
+    await redisClient.set(REDIS_KEYS.reward(rewardId), JSON.stringify(reward));
     
     // Ensure it's in the business rewards set
     await redisClient.sadd(REDIS_KEYS.businessRewards(businessId), rewardId);
@@ -113,7 +111,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     
     return res.json({
       success: true,
-      data: updatedReward,
+      data: reward,
     });
   }
   

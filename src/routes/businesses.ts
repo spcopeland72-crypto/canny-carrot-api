@@ -150,13 +150,13 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
-  // CRITICAL: Do NOT update updatedAt - Redis timestamps should only change when admin makes changes
-  // API is a transparent forwarder - preserve existing updatedAt unless explicitly provided
+  // API is a transparent pipe - store exactly what app sends (full replacement)
+  // App must send complete business record
+  // CRITICAL: Do NOT merge - full replacement only
   const updated: Business = {
-    ...existing,
-    ...updates,
+    ...updates, // Store exactly what app sends (complete record)
     id, // Ensure ID can't be changed
-    updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : existing.updatedAt, // Only update if explicitly provided
+    updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : existing.updatedAt, // Preserve timestamp if not provided
   };
   
   await redis.setBusiness(id, updated);

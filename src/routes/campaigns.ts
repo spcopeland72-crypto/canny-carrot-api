@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { redis, REDIS_KEYS, redisClient } from '../config/redis';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
-import { Campaign } from '../types';
+import { Campaign, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
 import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
 
@@ -118,19 +118,17 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   // Check if campaign with this ID already exists (for idempotency)
   const existingCampaignData = await redisClient.get(REDIS_KEYS.campaign(campaignId));
   if (existingCampaignData) {
-    // Campaign exists - merge with existing, preserving all fields
-    const existingCampaign = JSON.parse(existingCampaignData);
-    // API is a transparent forwarder - preserve updatedAt from request, or keep existing
-    // Do NOT auto-update timestamps - app manages timestamps
-    const updatedCampaign: any = {
-      ...existingCampaign, // Preserve all existing fields
-      ...req.body, // Update with new values from request (includes updatedAt if provided)
+    // Campaign exists - API is transparent pipe, store exactly what app sends (full replacement)
+    // App must send complete campaign record
+    const campaign: any = {
+      ...req.body, // Include ALL fields from request (complete record)
       id: campaignId, // Ensure ID can't be changed
-      businessId: existingCampaign.businessId, // Ensure business can't be changed
-      updatedAt: req.body.updatedAt !== undefined ? req.body.updatedAt : existingCampaign.updatedAt, // Preserve from request or existing
+      businessId: existingCampaignData ? JSON.parse(existingCampaignData).businessId : businessId, // Preserve businessId
+      createdAt: req.body.createdAt || JSON.parse(existingCampaignData).createdAt || now, // Preserve or use provided
+      updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
     
-    await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(updatedCampaign));
+    await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(campaign));
     
     // Ensure it's in the business campaigns set
     await redisClient.sadd(`business:${businessId}:campaigns`, campaignId);
@@ -145,7 +143,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     
     return res.json({
       success: true,
-      data: updatedCampaign,
+      data: campaign,
     });
   }
   
@@ -157,8 +155,13 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     businessId,
     createdAt: req.body.createdAt || now, // Only set if not provided
     updatedAt: req.body.updatedAt || now, // Only set if not provided
-    currentRedemptions: req.body.currentRedemptions !== undefined ? req.body.currentRedemptions : 0,
-    isActive: req.body.isActive !== undefined ? req.body.isActive : true,
+    status: req.body.status !== undefined ? req.body.status : (new Date(req.body.startDate) > new Date() ? 'scheduled' : 'active'),
+    targetAudience: req.body.targetAudience !== undefined ? req.body.targetAudience : 'all',
+    stats: req.body.stats !== undefined ? req.body.stats : {
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+    },
   };
   
     // Store campaign
