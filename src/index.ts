@@ -121,6 +121,14 @@ console.log('✅ [INDEX] Auth routes type:', typeof authRoutes);
 app.use('/api/v1/auth', authRoutes); // Authentication routes
 console.log('✅ [INDEX] Auth routes registered successfully');
 
+// ⚠️ TEMPORARY DEBUG: Redis write monitor endpoints - REMOVE BEFORE PRODUCTION
+app.get('/api/v1/debug/blocked-writes', getBlockedWritesHandler);
+app.delete('/api/v1/debug/blocked-writes', (req, res) => {
+  clearBlockedWrites();
+  res.json({ success: true, message: 'Blocked writes log cleared' });
+});
+console.log('⚠️ [INDEX] TEMPORARY: Redis write monitor debug endpoints registered - REMOVE BEFORE PRODUCTION');
+
 // Error handling
 app.use(errorHandler);
 
