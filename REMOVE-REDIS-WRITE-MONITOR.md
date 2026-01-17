@@ -6,12 +6,17 @@
 
 ## What It Does
 
-Monitors and blocks unauthorized Redis writes from apps. Only allows writes during:
+Monitors and blocks unauthorized Redis writes **FROM THE APPS**. Only allows app writes during:
 - Manual sync
 - Logout
 - Login update check
 
-All other writes are **BLOCKED** and **FLAGGED** for debugging.
+**EXEMPTIONS (always allowed):**
+- Business creation from website (POST /api/v1/businesses)
+- Customer creation from website (POST /api/v1/customers)
+- Any website/API-originated writes
+
+All other app-originated writes are **BLOCKED** and **FLAGGED** for debugging.
 
 ## Files to Remove
 

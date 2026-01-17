@@ -60,6 +60,9 @@ export const clearBlockedWrites = (): void => {
 
 /**
  * Middleware to monitor and block unauthorized Redis writes
+ * 
+ * Rule: Redis writes FROM THE APPS only allowed during sync/logout/login
+ * Website/API-originated writes (business/customer creation) are ALWAYS allowed
  */
 export const redisWriteMonitor = (entityType: 'business' | 'reward' | 'campaign') => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -67,6 +70,17 @@ export const redisWriteMonitor = (entityType: 'business' | 'reward' | 'campaign'
     if (req.method !== 'PUT' && req.method !== 'POST') {
       return next();
     }
+
+    // EXEMPT: Business creation from website (POST /api/v1/businesses without ID = new registration)
+    // These are website/API-originated, not app-originated, so always allowed
+    if (req.method === 'POST' && entityType === 'business' && !req.params.id) {
+      // Business creation/registration from website - always allowed
+      console.log(`✅ [REDIS WRITE MONITOR] Allowed: Business creation from website/API`);
+      return next();
+    }
+
+    // EXEMPT: Customer creation from website (handled separately, not monitored)
+    // Customer routes don't use this monitor, so they're always allowed
 
     const context = req.headers['x-sync-context'] as string | undefined;
     const entityId = req.params.id || req.body.id || 'unknown';
