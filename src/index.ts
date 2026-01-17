@@ -27,6 +27,7 @@ import userSubmissionsRoutes from './routes/userSubmissions'; // User submission
 import searchRoutes from './routes/search'; // GeoSearch routes
 // ⚠️ TEMPORARY DEBUG: Redis write monitor - REMOVE BEFORE PRODUCTION
 import { getBlockedWritesHandler, clearBlockedWrites } from './middleware/redisWriteMonitor';
+import debugRoutes from './routes/debug'; // Debug routes - REMOVE BEFORE PRODUCTION
 
 const app = express();
 
@@ -128,6 +129,10 @@ app.delete('/api/v1/debug/blocked-writes', (req, res) => {
   res.json({ success: true, message: 'Blocked writes log cleared' });
 });
 console.log('⚠️ [INDEX] TEMPORARY: Redis write monitor debug endpoints registered - REMOVE BEFORE PRODUCTION');
+
+// ⚠️ TEMPORARY DEBUG: Local storage viewer - REMOVE BEFORE PRODUCTION
+app.use('/api/v1/debug', debugRoutes);
+console.log('⚠️ [INDEX] TEMPORARY: Debug routes registered - REMOVE BEFORE PRODUCTION');
 
 // Error handling
 app.use(errorHandler);
