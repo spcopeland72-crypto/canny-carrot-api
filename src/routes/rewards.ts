@@ -5,6 +5,8 @@ import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Reward, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
 import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
+// ⚠️ TEMPORARY DEBUG: Redis write monitor - REMOVE BEFORE PRODUCTION
+import { redisWriteMonitor } from '../middleware/redisWriteMonitor';
 
 const router = Router();
 
@@ -47,7 +49,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /api/v1/rewards - Create a new reward
-router.post('/', asyncHandler(async (req: Request, res: Response) => {
+// ⚠️ TEMPORARY: Monitor blocks unauthorized writes - REMOVE BEFORE PRODUCTION
+router.post('/', redisWriteMonitor('reward'), asyncHandler(async (req: Request, res: Response) => {
   // Accept full reward object from client - API is a transparent forwarder
   const { id, businessId, name, stampsRequired } = req.body;
   
@@ -182,7 +185,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // PUT /api/v1/rewards/:id - Update a reward
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+// ⚠️ TEMPORARY: Monitor blocks unauthorized writes - REMOVE BEFORE PRODUCTION
+router.put('/:id', redisWriteMonitor('reward'), asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
   

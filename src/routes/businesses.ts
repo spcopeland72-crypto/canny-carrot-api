@@ -5,6 +5,8 @@ import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Business, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
 import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
+// ⚠️ TEMPORARY DEBUG: Redis write monitor - REMOVE BEFORE PRODUCTION
+import { redisWriteMonitor } from '../middleware/redisWriteMonitor';
 
 const router = Router();
 
@@ -108,7 +110,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // PUT /api/v1/businesses/:id - Update a business
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+// ⚠️ TEMPORARY: Monitor blocks unauthorized writes - REMOVE BEFORE PRODUCTION
+router.put('/:id', redisWriteMonitor('business'), asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
   

@@ -5,6 +5,8 @@ import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Campaign, ApiResponse } from '../types';
 import { saveEntityCopy } from '../services/repositoryCopyService';
 import { captureClientUpload, captureServerDownload } from '../services/debugCaptureService';
+// ⚠️ TEMPORARY DEBUG: Redis write monitor - REMOVE BEFORE PRODUCTION
+import { redisWriteMonitor } from '../middleware/redisWriteMonitor';
 
 const router = Router();
 
@@ -80,7 +82,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // POST /api/v1/campaigns - Create a new campaign
-router.post('/', asyncHandler(async (req: Request, res: Response) => {
+// ⚠️ TEMPORARY: Monitor blocks unauthorized writes - REMOVE BEFORE PRODUCTION
+router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request, res: Response) => {
   // Accept full campaign object from client - API is a transparent forwarder
   const { id, businessId, name } = req.body;
   
@@ -192,7 +195,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // PUT /api/v1/campaigns/:id
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+// ⚠️ TEMPORARY: Monitor blocks unauthorized writes - REMOVE BEFORE PRODUCTION
+router.put('/:id', redisWriteMonitor('campaign'), asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
   

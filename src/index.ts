@@ -25,6 +25,8 @@ import authRoutes from './routes/auth'; // Authentication routes
 import suggestionsRoutes from './routes/suggestions'; // Autocomplete suggestions
 import userSubmissionsRoutes from './routes/userSubmissions'; // User submissions for admin review
 import searchRoutes from './routes/search'; // GeoSearch routes
+// ⚠️ TEMPORARY DEBUG: Redis write monitor - REMOVE BEFORE PRODUCTION
+import { getBlockedWritesHandler, clearBlockedWrites } from './middleware/redisWriteMonitor';
 
 const app = express();
 
