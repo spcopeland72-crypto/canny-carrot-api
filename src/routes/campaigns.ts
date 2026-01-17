@@ -102,6 +102,10 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
       hasPinCode: !!req.body.pinCode,
       hasQrCode: !!req.body.qrCode,
       hasPointsPerPurchase: !!req.body.pointsPerPurchase,
+      hasStartDate: !!req.body.startDate,
+      startDateValue: req.body.startDate,
+      hasEndDate: !!req.body.endDate,
+      endDateValue: req.body.endDate,
       allKeys: Object.keys(req.body),
     });
   }
@@ -143,7 +147,43 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
       updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
     
+    // 🔍 LOG: What we're about to save to Redis (UPDATE path)
+    console.log(`💾 [CAMPAIGNS API] Saving campaign "${campaign.name}" (ID: ${campaignId}) to Redis:`, {
+      hasSelectedProducts: !!campaign.selectedProducts,
+      selectedProductsCount: campaign.selectedProducts?.length || 0,
+      selectedProductsValue: campaign.selectedProducts,
+      hasSelectedActions: !!campaign.selectedActions,
+      selectedActionsCount: campaign.selectedActions?.length || 0,
+      selectedActionsValue: campaign.selectedActions,
+      hasPinCode: !!campaign.pinCode,
+      pinCodeValue: campaign.pinCode,
+      hasQrCode: !!campaign.qrCode,
+      qrCodeLength: campaign.qrCode?.length || 0,
+      hasPointsPerPurchase: !!campaign.pointsPerPurchase,
+      pointsPerPurchaseValue: campaign.pointsPerPurchase,
+      allKeys: Object.keys(campaign),
+    });
+    console.log(`💾 [CAMPAIGNS API] Full campaign object being saved to Redis (first 2000 chars):`, JSON.stringify(campaign).substring(0, 2000));
+    
     await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(campaign));
+    
+    // 🔍 LOG: Verify what was actually saved to Redis
+    const savedData = await redisClient.get(REDIS_KEYS.campaign(campaignId));
+    if (savedData) {
+      const savedCampaign = JSON.parse(savedData);
+      console.log(`✅ [CAMPAIGNS API] Verified saved to Redis "${campaign.name}":`, {
+        hasSelectedProducts: !!savedCampaign.selectedProducts,
+        selectedProductsCount: savedCampaign.selectedProducts?.length || 0,
+        hasSelectedActions: !!savedCampaign.selectedActions,
+        selectedActionsCount: savedCampaign.selectedActions?.length || 0,
+        hasPinCode: !!savedCampaign.pinCode,
+        hasQrCode: !!savedCampaign.qrCode,
+        hasPointsPerPurchase: !!savedCampaign.pointsPerPurchase,
+        allKeys: Object.keys(savedCampaign),
+      });
+    } else {
+      console.error(`❌ [CAMPAIGNS API] CRITICAL: Campaign ${campaignId} was NOT saved to Redis!`);
+    }
     
     // Ensure it's in the business campaigns set
     await redisClient.sadd(`business:${businessId}:campaigns`, campaignId);
@@ -179,8 +219,52 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
     },
   };
   
+    // 🔍 LOG: What we're about to save to Redis (CREATE path)
+    console.log(`💾 [CAMPAIGNS API] Saving NEW campaign "${campaign.name}" (ID: ${campaignId}) to Redis:`, {
+      hasSelectedProducts: !!campaign.selectedProducts,
+      selectedProductsCount: campaign.selectedProducts?.length || 0,
+      selectedProductsValue: campaign.selectedProducts,
+      hasSelectedActions: !!campaign.selectedActions,
+      selectedActionsCount: campaign.selectedActions?.length || 0,
+      selectedActionsValue: campaign.selectedActions,
+      hasPinCode: !!campaign.pinCode,
+      pinCodeValue: campaign.pinCode,
+      hasQrCode: !!campaign.qrCode,
+      qrCodeLength: campaign.qrCode?.length || 0,
+      hasPointsPerPurchase: !!campaign.pointsPerPurchase,
+      pointsPerPurchaseValue: campaign.pointsPerPurchase,
+      hasStartDate: !!campaign.startDate,
+      startDateValue: campaign.startDate,
+      hasEndDate: !!campaign.endDate,
+      endDateValue: campaign.endDate,
+      allKeys: Object.keys(campaign),
+    });
+    console.log(`💾 [CAMPAIGNS API] Full campaign object being saved to Redis (first 2000 chars):`, JSON.stringify(campaign).substring(0, 2000));
+  
     // Store campaign
     await redisClient.set(REDIS_KEYS.campaign(campaignId), JSON.stringify(campaign));
+    
+    // 🔍 LOG: Verify what was actually saved to Redis
+    const savedData = await redisClient.get(REDIS_KEYS.campaign(campaignId));
+    if (savedData) {
+      const savedCampaign = JSON.parse(savedData);
+      console.log(`✅ [CAMPAIGNS API] Verified saved to Redis "${campaign.name}":`, {
+        hasSelectedProducts: !!savedCampaign.selectedProducts,
+        selectedProductsCount: savedCampaign.selectedProducts?.length || 0,
+        hasSelectedActions: !!savedCampaign.selectedActions,
+        selectedActionsCount: savedCampaign.selectedActions?.length || 0,
+        hasPinCode: !!savedCampaign.pinCode,
+        hasQrCode: !!savedCampaign.qrCode,
+        hasPointsPerPurchase: !!savedCampaign.pointsPerPurchase,
+        hasStartDate: !!savedCampaign.startDate,
+        startDateValue: savedCampaign.startDate,
+        hasEndDate: !!savedCampaign.endDate,
+        endDateValue: savedCampaign.endDate,
+        allKeys: Object.keys(savedCampaign),
+      });
+    } else {
+      console.error(`❌ [CAMPAIGNS API] CRITICAL: Campaign ${campaignId} was NOT saved to Redis!`);
+    }
     
     // Capture what was saved to Redis for debugging
     captureClientUpload('campaign', businessId, campaign).catch(err => 
