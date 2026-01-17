@@ -82,7 +82,12 @@ export const redisWriteMonitor = (entityType: 'business' | 'reward' | 'campaign'
     // EXEMPT: Customer creation from website (handled separately, not monitored)
     // Customer routes don't use this monitor, so they're always allowed
 
+    // Debug: Log all headers to see what we're receiving
+    const allHeaders = Object.keys(req.headers).map(key => `${key}: ${req.headers[key]}`).join(', ');
+    console.log(`🔍 [REDIS WRITE MONITOR] Request headers: ${allHeaders.substring(0, 200)}`);
+    
     const context = req.headers['x-sync-context'] as string | undefined;
+    console.log(`🔍 [REDIS WRITE MONITOR] Extracted context: ${context || 'MISSING'}`);
     const entityId = req.params.id || req.body.id || 'unknown';
     const businessId = req.body.businessId || req.params.businessId || 'unknown';
     const endpoint = req.path;
