@@ -92,6 +92,18 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
     captureClientUpload('campaign', businessId, req.body).catch(err => 
       console.error('[DEBUG] Error capturing client upload:', err)
     );
+    
+    // Debug: Log what we're receiving
+    console.log(`📥 [CAMPAIGNS API] Received campaign "${req.body.name || 'unnamed'}":`, {
+      hasSelectedProducts: !!req.body.selectedProducts,
+      selectedProductsCount: req.body.selectedProducts?.length || 0,
+      hasSelectedActions: !!req.body.selectedActions,
+      selectedActionsCount: req.body.selectedActions?.length || 0,
+      hasPinCode: !!req.body.pinCode,
+      hasQrCode: !!req.body.qrCode,
+      hasPointsPerPurchase: !!req.body.pointsPerPurchase,
+      allKeys: Object.keys(req.body),
+    });
   }
   
   // API is transparent pipe - no validation, no requirements
