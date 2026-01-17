@@ -36,8 +36,9 @@ app.use(helmet());
 app.use(cors({
   origin: config.corsOrigins,
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Sync-Context'],
-  exposedHeaders: ['X-Sync-Context'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Sync-Context', 'x-sync-context'],
+  exposedHeaders: ['X-Sync-Context', 'x-sync-context'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 }));
 app.use(express.json());
 

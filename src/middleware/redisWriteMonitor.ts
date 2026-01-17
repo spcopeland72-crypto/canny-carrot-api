@@ -84,10 +84,12 @@ export const redisWriteMonitor = (entityType: 'business' | 'reward' | 'campaign'
 
     // Debug: Log all headers to see what we're receiving
     const allHeaders = Object.keys(req.headers).map(key => `${key}: ${req.headers[key]}`).join(', ');
-    console.log(`🔍 [REDIS WRITE MONITOR] Request headers: ${allHeaders.substring(0, 200)}`);
+    console.log(`🔍 [REDIS WRITE MONITOR] Request headers: ${allHeaders.substring(0, 500)}`);
     
-    const context = req.headers['x-sync-context'] as string | undefined;
+    // Try both lowercase and original case (Express normalizes to lowercase)
+    const context = (req.headers['x-sync-context'] || req.headers['X-Sync-Context']) as string | undefined;
     console.log(`🔍 [REDIS WRITE MONITOR] Extracted context: ${context || 'MISSING'}`);
+    console.log(`🔍 [REDIS WRITE MONITOR] All header keys: ${Object.keys(req.headers).join(', ')}`);
     const entityId = req.params.id || req.body.id || 'unknown';
     const businessId = req.body.businessId || req.params.businessId || 'unknown';
     const endpoint = req.path;
