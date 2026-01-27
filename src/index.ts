@@ -57,6 +57,20 @@ app.use((req, res, next) => {
   next();
 });
 
+// Vercel: ensure Redis is connected before any /api/v1 handler.
+// Prevents "Stream isn't writeable" when first request uses Redis without connect.
+app.use('/api/v1', async (req, res, next) => {
+  if (process.env.VERCEL !== '1') return next();
+  try {
+    await connectRedis();
+    next();
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('❌ [Redis] connect before /api/v1 failed:', msg);
+    res.status(503).json({ success: false, error: 'Redis unavailable', detail: msg });
+  }
+});
+
 // Root route - API information
 app.get('/', (req, res) => {
   res.json({
