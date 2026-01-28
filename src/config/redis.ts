@@ -180,7 +180,29 @@ export const redis = {
       await redisClient.set(key, JSON.stringify(customer));
     }
   },
-  
+
+  /** Resolve customer id from email index. Normalizes email (lowercase, trim). */
+  async getCustomerIdByEmail(email: string): Promise<string | null> {
+    const n = (email ?? '').toString().toLowerCase().trim();
+    if (!n) return null;
+    const key = `customer:email:${n}`;
+    const data = await redisClient.get(key);
+    if (!data) return null;
+    try {
+      const v = JSON.parse(data);
+      return (v && typeof v.customerId === 'string') ? v.customerId : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /** Write email → customerId index. Normalizes email. */
+  async setCustomerEmailIndex(email: string, customerId: string): Promise<void> {
+    const n = (email ?? '').toString().toLowerCase().trim();
+    if (!n) return;
+    await redisClient.set(`customer:email:${n}`, JSON.stringify({ customerId }));
+  },
+
   // Member operations (alias for customer - for backward compatibility)
   async getMember(id: string) {
     // Try customer first, then member for backward compatibility

@@ -9,7 +9,10 @@
     "start": "node dist/index.js",
     "test": "jest",
     "vercel-build": "npm run build",
-    "list-emails": "ts-node-dev --transpile-only scripts/list-all-emails.ts"
+    "list-emails": "ts-node-dev --transpile-only scripts/list-all-emails.ts",
+    "build-customer-schema": "ts-node --transpile-only scripts/build-customer-schema.ts",
+    "seed-clare-customer": "ts-node --transpile-only scripts/seed-clare-customer-record.ts",
+    "smoke-test-customer-api": "node tools/smoke-test-customer-api.js"
   },
   "keywords": [
     "loyalty",

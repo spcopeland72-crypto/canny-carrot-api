@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { redis, REDIS_KEYS } from '../config/redis';
+import { redis } from '../config/redis';
+import { customerRecordService } from '../services/customerRecordService';
 import { asyncHandler, ApiError } from '../middleware/errorHandler';
 import { Customer, ApiResponse } from '../types';
+import type { CustomerRecord } from '../types/customerRecord';
 
 const router = Router();
 
@@ -20,6 +22,15 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   };
   
   res.json(response);
+}));
+
+// GET /api/v1/customers/by-email/:email - Resolve by email, return full record (account + rewards)
+router.get('/by-email/:email', asyncHandler(async (req: Request, res: Response) => {
+  const email = decodeURIComponent((req.params.email ?? '').trim());
+  if (!email) throw new ApiError(400, 'Email is required');
+  const record = await customerRecordService.getByEmail(email);
+  if (!record) throw new ApiError(404, 'Customer not found');
+  res.json({ success: true, data: record });
 }));
 
 // POST /api/v1/customers - Create a new customer
@@ -51,10 +62,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   
   // Store in Redis
   await redis.setCustomer(id, customer);
-  
-  // Also index by email for lookups
-  await redis.setCustomer(`email:${email.toLowerCase()}`, { customerId: id });
-  
+  await redis.setCustomerEmailIndex(email, id);
+
   const response: ApiResponse<Customer> = {
     success: true,
     data: customer,
@@ -63,25 +72,15 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(response);
 }));
 
-// GET /api/v1/customers/:id - Get a specific customer
+// GET /api/v1/customers/:id - Get full record (account + rewards)
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  
-  const customer = await redis.getCustomer(id);
-  
-  if (!customer) {
-    throw new ApiError(404, 'Customer not found');
-  }
-  
-  const response: ApiResponse<Customer> = {
-    success: true,
-    data: customer,
-  };
-  
-  res.json(response);
+  const record = await customerRecordService.getById(id);
+  if (!record) throw new ApiError(404, 'Customer not found');
+  res.json({ success: true, data: record });
 }));
 
-// PUT /api/v1/customers/:id - Update a customer
+// PUT /api/v1/customers/:id - Update a customer (merge)
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const updates = req.body;
@@ -92,21 +91,47 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Customer not found');
   }
   
-  const updated: Customer = {
+  const updated: Customer & { rewards?: unknown[] } = {
     ...existing,
     ...updates,
-    id, // Ensure ID can't be changed
+    id,
     updatedAt: new Date().toISOString(),
   };
-  
+  if (Array.isArray(updates?.rewards)) updated.rewards = updates.rewards;
+
   await redis.setCustomer(id, updated);
-  
-  const response: ApiResponse<Customer> = {
+  const email = updated.email ?? existing?.email;
+  if (email) await redis.setCustomerEmailIndex(email, id);
+
+  const response: ApiResponse<typeof updated> = {
     success: true,
     data: updated,
   };
   
   res.json(response);
+}));
+
+// PUT /api/v1/customers/:id/sync - Full replace: app sends { ...account, rewards }.
+// API adapter stores CustomerRecord, updates email index. Returns app-shaped blob.
+router.put('/:id/sync', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const body = req.body as Record<string, unknown>;
+  if (!body || typeof body !== 'object') throw new ApiError(400, 'Request body must be an object');
+  const rewards = Array.isArray(body.rewards) ? body.rewards : [];
+  const now = new Date().toISOString();
+  const { rewards: _r, ...account } = body;
+  const record: CustomerRecord = {
+    ...(account as Partial<CustomerRecord>),
+    id,
+    email: (body.email as string) ?? '',
+    firstName: (body.firstName as string) ?? '',
+    lastName: (body.lastName as string) ?? '',
+    createdAt: (body.createdAt as string) || now,
+    updatedAt: now,
+    rewards: rewards as CustomerRecord['rewards'],
+  };
+  await customerRecordService.replace(id, record);
+  res.json({ success: true, data: record });
 }));
 
 // GET /api/v1/customers/:id/stamps - Get customer's stamps across all businesses
@@ -186,6 +211,9 @@ router.post('/:id/stamps', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 export default router;
+
+
+
 
 
 
