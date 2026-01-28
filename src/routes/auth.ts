@@ -1,6 +1,6 @@
 /**
- * Authentication Routes for Business App
- * Handles business user login and account creation
+ * Authentication Routes for Business App and Customer App
+ * Business: login, register (invitation). Customer: login, register (email must match existing customer).
  */
 
 import { Router, Request, Response } from 'express';
@@ -12,13 +12,19 @@ import { ApiResponse } from '../types';
 
 const router = Router();
 
-// JWT secret (in production, use environment variable)
 const JWT_SECRET = process.env.JWT_SECRET || 'canny-carrot-jwt-secret-change-in-production';
 
 interface BusinessAuth {
   email: string;
   passwordHash: string;
   businessId: string;
+  createdAt: string;
+}
+
+interface CustomerAuth {
+  email: string;
+  passwordHash: string;
+  customerId: string;
   createdAt: string;
 }
 
@@ -195,6 +201,84 @@ router.post('/business/login', asyncHandler(async (req: Request, res: Response) 
     },
   };
   
+  res.json(response);
+}));
+
+/**
+ * POST /api/v1/auth/customer/register
+ * Set password for existing customer (email must match customer record).
+ */
+router.post('/customer/register', asyncHandler(async (req: Request, res: Response) => {
+  await connectRedis();
+  const { email, password } = req.body;
+  if (!email || !password) throw new ApiError(400, 'Email and password are required');
+  if (password.length < 8) throw new ApiError(400, 'Password must be at least 8 characters');
+
+  const emailLower = (email as string).toLowerCase().trim();
+  const customerId = await redis.getCustomerIdByEmail(emailLower);
+  if (!customerId) throw new ApiError(404, 'No customer account found for this email');
+
+  const authKey = REDIS_KEYS.customerAuthByEmail(emailLower);
+  const existing = await redisClient.get(authKey);
+  if (existing) throw new ApiError(409, 'Account already exists for this email');
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const authData: CustomerAuth = {
+    email: emailLower,
+    passwordHash,
+    customerId,
+    createdAt: new Date().toISOString(),
+  };
+  await redisClient.set(authKey, JSON.stringify(authData));
+
+  const token = jwt.sign(
+    { email: emailLower, customerId, type: 'customer' },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  const response: ApiResponse<{ token: string; customerId: string; email: string }> = {
+    success: true,
+    data: { token, customerId, email: emailLower },
+  };
+  res.status(201).json(response);
+}));
+
+/**
+ * POST /api/v1/auth/customer/login
+ * Login with email and password. Same contract as business login.
+ */
+router.post('/customer/login', asyncHandler(async (req: Request, res: Response) => {
+  await connectRedis();
+  const { email, password } = req.body;
+  if (!email || !password) throw new ApiError(400, 'Email and password are required');
+
+  const emailLower = (email as string).toLowerCase().trim();
+  const authKey = REDIS_KEYS.customerAuthByEmail(emailLower);
+  const authDataStr = await redisClient.get(authKey);
+  if (!authDataStr) throw new ApiError(401, 'Invalid email or password');
+
+  const authData: CustomerAuth = JSON.parse(authDataStr);
+  const valid = await bcrypt.compare(password, authData.passwordHash);
+  if (!valid) throw new ApiError(401, 'Invalid email or password');
+
+  const customer = await redis.getCustomer(authData.customerId);
+  if (!customer) throw new ApiError(404, 'Customer account not found');
+
+  const token = jwt.sign(
+    { email: emailLower, customerId: authData.customerId, type: 'customer' },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+
+  const response: ApiResponse<{ token: string; customerId: string; email: string }> = {
+    success: true,
+    data: {
+      token,
+      customerId: authData.customerId,
+      email: emailLower,
+    },
+  };
   res.json(response);
 }));
 

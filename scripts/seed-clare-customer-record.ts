@@ -14,6 +14,7 @@
 
 import Redis from 'ioredis';
 import { v5 as uuidv5 } from 'uuid';
+import bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
@@ -25,12 +26,15 @@ const REDIS_KEYS = {
   customer: (id: string) => `customer:${id}`,
   customerEmail: (email: string) => `customer:email:${email.toLowerCase().trim()}`,
   customersAll: 'customers:all',
+  customerAuthByEmail: (email: string) => `customer:auth:${email.toLowerCase().trim()}`,
 };
 
 /** Deterministic UUID for Clare (seed idempotent). Primary id is always UUID; email is index only. */
 const CUSTOMER_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 const CLARE_ID = uuidv5('clare-langley', CUSTOMER_NAMESPACE);
 const CLARE_EMAIL = 'laverickclare@hotmail.com';
+/** Default password for Clare (customer login). Use /auth/customer/login. */
+const CLARE_DEFAULT_PASSWORD = 'Clare1234';
 
 interface RepoReward {
   id: string;
@@ -130,9 +134,11 @@ function buildClareRecord(repo: RepoData): CustomerRecord {
   };
 }
 
+const REDIS_URL_DEFAULT = 'redis://canny-carrot:ccRewards99!@redis-15877.crce204.eu-west-2-3.ec2.cloud.redislabs.com:15877';
+
 async function main() {
   const force = process.argv.includes('--force');
-  const redisUrl = process.env.REDIS_URL;
+  const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL || REDIS_URL_DEFAULT;
   if (!redisUrl) {
     console.error('❌ REDIS_URL not set. Use .env or REDIS_URL=...');
     process.exit(1);
@@ -150,13 +156,21 @@ async function main() {
   console.log('📡 Connecting to Redis...');
   const redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
-    connectTimeout: 10000,
+    connectTimeout: 15000,
     commandTimeout: 30000,
     enableReadyCheck: false,
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
+    retryStrategy: (t) => Math.min(t * 200, 3000),
   });
 
   try {
+    await new Promise<void>((resolve, reject) => {
+      const done = () => { redis.removeListener('error', onErr); redis.removeListener('ready', onReady); };
+      const onErr = (e: Error) => { done(); reject(e); };
+      const onReady = () => { done(); resolve(); };
+      redis.once('error', onErr);
+      redis.once('ready', onReady);
+    });
     await redis.ping();
     console.log('✅ Connected\n');
 
@@ -170,6 +184,24 @@ async function main() {
       console.log(`   ${emailKey}`);
       const parsed = JSON.parse(existing) as CustomerRecord;
       console.log(`   rewards: ${parsed.rewards?.length ?? 0} items`);
+      const authKey = REDIS_KEYS.customerAuthByEmail(CLARE_EMAIL);
+      const existingAuth = await redis.get(authKey);
+      if (!existingAuth) {
+        const passwordHash = await bcrypt.hash(CLARE_DEFAULT_PASSWORD, 10);
+        await redis.set(
+          authKey,
+          JSON.stringify({
+            email: CLARE_EMAIL.toLowerCase(),
+            passwordHash,
+            customerId: CLARE_ID,
+            createdAt: new Date().toISOString(),
+          })
+        );
+        console.log(`✅ SET ${authKey} (login password: ${CLARE_DEFAULT_PASSWORD})`);
+      } else {
+        console.log(`ℹ️  Auth already exists: ${authKey}`);
+      }
+      console.log('✅ Done.');
       redis.disconnect();
       return;
     }
@@ -184,6 +216,24 @@ async function main() {
 
     await redis.sadd(REDIS_KEYS.customersAll, CLARE_ID);
     console.log(`✅ SADD ${REDIS_KEYS.customersAll} "${CLARE_ID}"`);
+
+    const authKey = REDIS_KEYS.customerAuthByEmail(CLARE_EMAIL);
+    const existingAuth = await redis.get(authKey);
+    if (force || !existingAuth) {
+      const passwordHash = await bcrypt.hash(CLARE_DEFAULT_PASSWORD, 10);
+      await redis.set(
+        authKey,
+        JSON.stringify({
+          email: CLARE_EMAIL.toLowerCase(),
+          passwordHash,
+          customerId: CLARE_ID,
+          createdAt: new Date().toISOString(),
+        })
+      );
+      console.log(`✅ SET ${authKey} (login password: ${CLARE_DEFAULT_PASSWORD})`);
+    } else {
+      console.log(`ℹ️  Auth already exists: ${authKey}`);
+    }
 
     console.log(`\n📋 Clare Langley (${CLARE_EMAIL}) id=${CLARE_ID}`);
     console.log(`   ${record.rewards.length} rewards/campaigns`);

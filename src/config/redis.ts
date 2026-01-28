@@ -130,6 +130,7 @@ export const REDIS_KEYS = {
   businessMembers: (businessId: string) => `business:${businessId}:members`,
   businessAuthByEmail: (email: string) => `business:auth:${email.toLowerCase()}`,
   businessDevices: (businessId: string) => `business:${businessId}:devices`,
+  customerAuthByEmail: (email: string) => `customer:auth:${email.toLowerCase()}`,
   
   // Rewards
   reward: (id: string) => `reward:${id}`,
