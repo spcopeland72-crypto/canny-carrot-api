@@ -33,8 +33,15 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+const allowedSet = new Set(
+  Array.isArray(config.corsOrigins) ? config.corsOrigins : [config.corsOrigins].filter(Boolean)
+);
 app.use(cors({
-  origin: config.corsOrigins,
+  origin: (origin, cb) => {
+    if (origin && allowedSet.has(origin)) return cb(null, origin);
+    if (!origin) return cb(null, true); // allow no-origin (e.g. same-origin, Postman)
+    return cb(null, false);
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Sync-Context', 'x-sync-context'],
   exposedHeaders: ['X-Sync-Context', 'x-sync-context'],
