@@ -36,18 +36,31 @@ if (!process.env.REDIS_URL || !process.env.REDIS_URL.trim()) {
 
 const { connectRedis, redisClient, REDIS_KEYS } = require('../../dist/config/redis');
 
+/** Campaign item ids are "campaign-{documentId}-{slug}". Return document id for token:{campaignDocId}:customers. */
+function campaignDocIdFromItemId(itemId) {
+  if (!itemId || !itemId.startsWith('campaign-')) return null;
+  const after = itemId.slice(9);
+  const first = after.split('-')[0];
+  return first || null;
+}
+
 /** Token-link index: token id = document id for both rewards and campaigns. No prefix. */
 function getBusinessIdsAndTokenIds(rewards) {
   const businessIds = new Set();
   const tokenIds = new Set();
-  if (!Array.isArray(rewards)) return { businessIds, tokenIds };
+  const campaignDocIds = new Set();
+  if (!Array.isArray(rewards)) return { businessIds, tokenIds, campaignDocIds };
   for (const r of rewards) {
-    const bid = (r.businessId ?? '').toString().trim();
     const tid = (r.id ?? '').toString().trim();
+    const rawBid = (r.businessId ?? '').toString().trim();
+    const rawBName = (r.businessName ?? '').toString().trim();
+    const bid = rawBName && rawBName.startsWith('business_') ? rawBName : rawBid;
     if (bid) businessIds.add(bid);
     if (tid) tokenIds.add(tid);
+    const cDocId = campaignDocIdFromItemId(tid);
+    if (cDocId) campaignDocIds.add(cDocId);
   }
-  return { businessIds, tokenIds };
+  return { businessIds, tokenIds, campaignDocIds };
 }
 
 async function scanCustomerIds() {
@@ -87,8 +100,8 @@ async function run() {
       continue;
     }
     const rewards = Array.isArray(record.rewards) ? record.rewards : [];
-    const { businessIds, tokenIds } = getBusinessIdsAndTokenIds(rewards);
-    if (businessIds.size === 0 && tokenIds.size === 0) {
+    const { businessIds, tokenIds, campaignDocIds } = getBusinessIdsAndTokenIds(rewards);
+    if (businessIds.size === 0 && tokenIds.size === 0 && campaignDocIds.size === 0) {
       processed++;
       continue;
     }
@@ -100,6 +113,10 @@ async function run() {
     }
     for (const tid of tokenIds) {
       await redisClient.sadd(REDIS_KEYS.tokenCustomers(tid), customerId);
+      totalTokenLinks++;
+    }
+    for (const cDocId of campaignDocIds) {
+      await redisClient.sadd(REDIS_KEYS.tokenCustomers(cDocId), customerId);
       totalTokenLinks++;
     }
 

@@ -14,7 +14,9 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 
 | Script | Purpose | Usage |
 |--------|---------|--------|
-| **inspect-customer-redis.js** | Read customer record by email (account + embedded rewards). | See [Customer data reading](#customer-data-reading-inspect-customer-redisjs) below. |
+| **inspect-customer-redis.js** | Read customer record by email (account + embedded rewards; summary). | See [Customer data reading](#customer-data-reading-inspect-customer-redisjs) below. |
+| **list-customer-record-redis.js** | Full customer record via API (account, rewards, campaigns, transactionLog). By email or `--id <uuid>`. | See [List customer record](#list-customer-record-list-customer-record-redisjs) below. |
+| **read-business-record-api.js** | Full business record via API (profile + rewards + campaigns). No Redis or build. | `node scripts/redis/read-business-record-api.js <businessId>` |
 | **inspect-business-clare-langle-redis.js** | Inspect Redis for business “Clare’s Cakes” (name match). | `node scripts/redis/inspect-business-clare-langle-redis.js` |
 | **dump-redis-record.js** | Dump full business or customer record (profile, rewards, campaigns, etc.) to console or file. | See `README-REDIS-DUMP.md` in this folder. |
 | **backup-customer-record.js** | Backup customer record to a timestamped file (run before risky operations; restorable). | See [Backup customer record](#backup-customer-record-backup-customer-recordjs) below. |
@@ -172,6 +174,49 @@ node scripts/redis/check-customer-record-redis.js --id bbc62a7c-9f55-5382-b6ad-b
 
 ---
 
+## List customer record: `list-customer-record-redis.js`
+
+**Purpose:** Fetch the full customer record from the API (Redis-backed) and print it as JSON. Use after customer app login/sync to see account, `rewards[]` (rewards and campaigns), and `transactionLog`. API-based; no build or REDIS_URL.
+
+**Usage:**
+
+```bash
+cd canny-carrot-api
+
+# By email
+node scripts/redis/list-customer-record-redis.js laverickclare@hotmail.com
+node scripts/redis/list-customer-record-redis.js --email <email>
+
+# By customer UUID
+node scripts/redis/list-customer-record-redis.js --id bbc62a7c-9f55-5382-b6ad-be4ecb53514e
+```
+
+**Output:** Full JSON (id, email, firstName, lastName, rewards[], transactionLog, etc.).
+
+**Env:** `API_URL` — API base (default `https://api.cannycarrot.com`).
+
+---
+
+## Use case: Inspect business record, customer record, and index after sync
+
+After **business app** sync (create campaigns, sync) or **customer app** (refresh, login, scan campaigns, sync), run from `canny-carrot-api`:
+
+```bash
+# Business: profile + rewards + campaigns
+node scripts/redis/read-business-record-api.js <businessId>
+
+# Customer: full record (account, rewards[], transactionLog)
+node scripts/redis/list-customer-record-redis.js --id <customerId>
+# or: node scripts/redis/list-customer-record-redis.js <email>
+
+# Token-link index
+node scripts/redis/show-index.js
+```
+
+See also [CODEX/TOOLS_MANIFEST.md](../../CODEX/TOOLS_MANIFEST.md).
+
+---
+
 ## Quick reference
 
 ```bash
@@ -193,6 +238,9 @@ node scripts/redis/list-customer-record-redis.js laverickclare@hotmail.com
 # Full dump (business or customer) — see README-REDIS-DUMP.md
 node scripts/redis/dump-redis-record.js --type customer --id <uuid>
 node scripts/redis/dump-redis-record.js --type business --email business@example.com
+
+# Business record via API (profile + rewards + campaigns; no build)
+node scripts/redis/read-business-record-api.js <businessId>
 
 # Business by name (direct Redis)
 node scripts/redis/read-business-redis-data.js "The Stables"
