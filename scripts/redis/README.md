@@ -19,6 +19,7 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 | **dump-redis-record.js** | Dump full business or customer record (profile, rewards, campaigns, etc.) to console or file. | See `README-REDIS-DUMP.md` in this folder. |
 | **backup-customer-record.js** | Backup customer record to a timestamped file (run before risky operations; restorable). | See [Backup customer record](#backup-customer-record-backup-customer-recordjs) below. |
 | **read-business-redis-data.js** | Read business Redis data by business name (direct Redis; needs build + REDIS_URL). | `node scripts/redis/read-business-redis-data.js "The Stables"` |
+| **show-index.js** | Dump token-link index: `business:*:customers`, `token:*:customers`, `customer:*:businesses`, `customer:*:tokens`. | `node scripts/redis/show-index.js` (needs build + REDIS_URL) |
 
 ---
 

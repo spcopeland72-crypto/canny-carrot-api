@@ -11,6 +11,54 @@ import { redisClient, REDIS_KEYS, connectRedis } from '../config/redis';
 const router = express.Router();
 
 /**
+ * Return token-link index contents (for scripts/inspection).
+ * GET /api/v1/redis/index — must be before /:command so GET /index is matched.
+ */
+router.get('/index', async (req, res) => {
+  try {
+    await connectRedis();
+    const patterns = ['business:*:customers', 'token:*:customers', 'customer:*:businesses', 'customer:*:tokens'];
+    const out: Record<string, string[]> = {};
+    for (const pattern of patterns) {
+      let cursor = '0';
+      do {
+        const [next, keys] = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
+        cursor = next;
+        for (const key of keys || []) {
+          const members = await redisClient.smembers(key).catch(() => []);
+          out[key] = members;
+        }
+      } while (cursor !== '0');
+    }
+    res.json({ data: out });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to read index' });
+  }
+});
+
+/**
+ * Health check for Redis connection.
+ * GET /api/v1/redis/health
+ */
+router.get('/health', async (req, res) => {
+  try {
+    const status = redisClient.status;
+    const ping = await redisClient.ping();
+    res.json({
+      status: status === 'ready' ? 'connected' : status,
+      ping: ping === 'PONG' ? 'ok' : 'failed',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+/**
  * Execute Redis command via HTTP API
  * POST /api/v1/redis/:command
  * Body: { args: any[] }
@@ -144,29 +192,6 @@ router.post('/:command', async (req, res) => {
     });
     res.status(500).json({
       error: error.message || 'Redis operation failed',
-    });
-  }
-});
-
-/**
- * Health check for Redis connection
- * GET /api/v1/redis/health
- */
-router.get('/health', async (req, res) => {
-  try {
-    const status = redisClient.status;
-    const ping = await redisClient.ping();
-    
-    res.json({
-      status: status === 'ready' ? 'connected' : status,
-      ping: ping === 'PONG' ? 'ok' : 'failed',
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      status: 'disconnected',
-      error: error.message,
-      timestamp: new Date().toISOString(),
     });
   }
 });
