@@ -6,7 +6,7 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 
 **Requirements (API-based scripts):** Node.js 18+, no build. They call the API Redis proxy (`POST /api/v1/redis/<command>`). Set `API_URL` if not using production (default `https://api.cannycarrot.com`).
 
-**Requirements (direct Redis):** For `read-business-redis-data.js`, the API must be built (`npm run build`) and `REDIS_URL` in `.env` at `canny-carrot-api` root.
+**Requirements (direct Redis):** Scripts that use direct Redis (`read-business-redis-data.js`, `backfill-token-index.js`) need `npm run build` and use `REDIS_URL` from `.env` at `canny-carrot-api` root.
 
 ---
 
@@ -18,8 +18,60 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 | **inspect-business-clare-langle-redis.js** | Inspect Redis for business “Clare’s Cakes” (name match). | `node scripts/redis/inspect-business-clare-langle-redis.js` |
 | **dump-redis-record.js** | Dump full business or customer record (profile, rewards, campaigns, etc.) to console or file. | See `README-REDIS-DUMP.md` in this folder. |
 | **backup-customer-record.js** | Backup customer record to a timestamped file (run before risky operations; restorable). | See [Backup customer record](#backup-customer-record-backup-customer-recordjs) below. |
-| **read-business-redis-data.js** | Read business Redis data by business name (direct Redis; needs build + REDIS_URL). | `node scripts/redis/read-business-redis-data.js "The Stables"` |
-| **show-index.js** | Dump token-link index: `business:*:customers`, `token:*:customers`, `customer:*:businesses`, `customer:*:tokens`. | `node scripts/redis/show-index.js` (needs build + REDIS_URL) |
+| **read-business-redis-data.js** | Read business Redis data by business name (direct Redis; build; uses REDIS_URL from .env). | `node scripts/redis/read-business-redis-data.js "The Stables"` |
+| **show-index.js** | Dump token-link index (business/token/customer sets). API-based; no build or REDIS_URL. | See [Token-link index](#token-link-index-show-indexjs) below. |
+| **backfill-token-index.js** | Populate token-link index from legacy customer records (one-time backfill). Direct Redis; build; uses REDIS_URL from .env. | See [Backfill token index](#backfill-token-index-backfill-token-indexjs) below. |
+
+---
+
+## Backfill token index: `backfill-token-index.js`
+
+**Purpose:** One-time backfill of the token-link index from existing customer records. Scans all `customer:*` records, reads `rewards[]` from each, and populates `business:*:customers`, `token:*:customers`, `customer:*:businesses`, `customer:*:tokens`. New token-related activity (customer sync via `replace()`) keeps the index updated automatically.
+
+**Requirements:** `npm run build`. Uses `REDIS_URL` from `.env` at `canny-carrot-api` root.
+
+**Usage:**
+
+```bash
+cd canny-carrot-api
+npm run build
+node scripts/redis/backfill-token-index.js
+```
+
+**Output:** Progress, then summary (customers processed, with rewards, SADD counts). No changes to customer record bodies; only index sets are written.
+
+**See also:** [CODEX/TOKEN_LINK_INDEXES.md](../../CODEX/TOKEN_LINK_INDEXES.md).
+
+---
+
+## Token-link index: `show-index.js`
+
+**Purpose:** Show the contents of the token-link index: which customers are linked to which businesses and tokens (rewards/campaigns). Uses the same API that serves Clare's and The Stables data. No local Redis or build required.
+
+**API:** `GET /api/v1/redis/index` (returns `{ data: { "key": [members...], ... } }`).
+
+**Redis keys dumped:**
+
+- `business:{businessId}:customers` — customer UUIDs with at least one token from this business
+- `token:{tokenId}:customers` — customer UUIDs who have this reward or campaign
+- `customer:{customerId}:businesses` — business UUIDs this customer has tokens with
+- `customer:{customerId}:tokens` — token UUIDs (reward + campaign ids) this customer has
+
+**Usage:**
+
+```bash
+cd canny-carrot-api
+
+node scripts/redis/show-index.js
+```
+
+**Options:**
+
+- `API_URL` — API base URL (default `https://api.cannycarrot.com`).
+
+**Output:** Each index key and its SET members (up to 20 shown per key; count for all). `(no index keys found)` if the index is empty.
+
+**See also:** [CODEX/TOKEN_LINK_INDEXES.md](../../CODEX/TOKEN_LINK_INDEXES.md), [CODEX/TOOLS_MANIFEST.md](../../CODEX/TOOLS_MANIFEST.md).
 
 ---
 
@@ -128,4 +180,10 @@ node scripts/redis/dump-redis-record.js --type business --email business@example
 
 # Business by name (direct Redis)
 node scripts/redis/read-business-redis-data.js "The Stables"
+
+# Token-link index (API; no build)
+node scripts/redis/show-index.js
+
+# Backfill token-link index from legacy customer records (direct Redis)
+node scripts/redis/backfill-token-index.js
 ```
