@@ -191,12 +191,12 @@ router.get('/:id/tokens', asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, data: { tokenIds } });
 }));
 
-/** Compute lastScanAt, scansLast30, scansLast90 from transactionLog for a token (reward/campaign) and business */
+/** Compute lastScanAt, scansLast30, scansLast90, totalScans from transactionLog for a token (reward/campaign) and business */
 function scanAnalytics(
   transactionLog: { timestamp: string; action: string; data: Record<string, unknown> }[] | undefined,
   tokenId: string,
   businessId: string
-): { lastScanAt: string | null; scansLast30: number; scansLast90: number } {
+): { lastScanAt: string | null; scansLast30: number; scansLast90: number; totalScans: number } {
   const log = Array.isArray(transactionLog) ? transactionLog : [];
   const now = Date.now();
   const ms30 = 30 * 24 * 60 * 60 * 1000;
@@ -204,6 +204,7 @@ function scanAnalytics(
   let lastScanAt: string | null = null;
   let scansLast30 = 0;
   let scansLast90 = 0;
+  let totalScans = 0;
   for (const e of log) {
     if (e.action !== 'SCAN') continue;
     const d = e.data || {};
@@ -215,10 +216,11 @@ function scanAnalytics(
     if (!matchesToken) continue;
     const ts = e.timestamp ? new Date(e.timestamp).getTime() : 0;
     if (ts && (!lastScanAt || ts > new Date(lastScanAt).getTime())) lastScanAt = e.timestamp;
+    totalScans++;
     if (ts >= now - ms90) scansLast90++;
     if (ts >= now - ms30) scansLast30++;
   }
-  return { lastScanAt, scansLast30, scansLast90 };
+  return { lastScanAt, scansLast30, scansLast90, totalScans };
 }
 
 // GET /api/v1/businesses/:id/tokens/with-customers - Each token (reward, campaign) with customers and analytics metadata
@@ -242,6 +244,7 @@ router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: 
       lastScanAt: string | null;
       scansLast30: number;
       scansLast90: number;
+      totalScans: number;
     }>;
   }> = [];
 
@@ -259,13 +262,13 @@ router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: 
       const item = rewards.find((r: { id?: string }) => (r.id ?? '').toString() === tokenId);
       const pointsEarned = typeof (item as { pointsEarned?: number })?.pointsEarned === 'number' ? (item as { pointsEarned: number }).pointsEarned : (typeof (item as { count?: number })?.count === 'number' ? (item as { count: number }).count : 0);
       const pointsRequired = typeof (item as { requirement?: number })?.requirement === 'number' ? (item as { requirement: number }).requirement : (typeof (item as { total?: number })?.total === 'number' ? (item as { total: number }).total : 1);
-      const { lastScanAt, scansLast30, scansLast90 } = scanAnalytics(
+      const { lastScanAt, scansLast30, scansLast90, totalScans } = scanAnalytics(
         (customer as { transactionLog?: { timestamp: string; action: string; data: Record<string, unknown> }[] }).transactionLog,
         tokenId,
         businessId
       );
       const customerName = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || (customer.name ?? '') || customer.email || cid;
-      customers.push({ customerId: cid, customerName, pointsEarned, pointsRequired, lastScanAt, scansLast30, scansLast90 });
+      customers.push({ customerId: cid, customerName, pointsEarned, pointsRequired, lastScanAt, scansLast30, scansLast90, totalScans });
     }
     tokensWithCustomers.push({ tokenId, type, name: (name ?? tokenId).toString(), customers });
   };
