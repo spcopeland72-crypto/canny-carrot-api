@@ -53,6 +53,10 @@ export interface CustomerRecord {
   totalStamps?: number;
   totalRedemptions?: number;
   dateOfBirth?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  postcode?: string;
   homeRegion?: string;
   deletedAt?: string;
   favoriteBusiness?: string;
@@ -66,4 +70,6 @@ export interface CustomerRecord {
     lastActiveAt?: string;
   }>;
   rewards: CustomerRecordRewardItem[];
+  /** Transaction log: SCAN (what was scanned), EDIT (what changed), ACTION (e.g. redeem). Capped at 300. */
+  transactionLog?: { timestamp: string; action: string; data: Record<string, unknown> }[];
 }

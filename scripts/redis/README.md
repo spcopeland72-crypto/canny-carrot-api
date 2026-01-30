@@ -80,6 +80,29 @@ node scripts/redis/backup-customer-record.js --id bbc62a7c-9f55-5382-b6ad-be4ecb
 
 ---
 
+## Check customer record: `check-customer-record-redis.js`
+
+**Purpose:** Confirm that all data the app sends in the sync body is stored in Redis. Fetches the customer record via the API and checks for every expected top-level key: `id`, `email`, `firstName`, `lastName`, `phone`, `dateOfBirth`, `addressLine1`, `addressLine2`, `city`, `postcode`, `createdAt`, `updatedAt`, `preferences`, `totalStamps`, `totalRedemptions`, `rewards`, `transactionLog`. Use after sync/logout to verify nothing is dropped (API is pass-through).
+
+**Usage:**
+
+```bash
+cd canny-carrot-api
+
+# By email
+node scripts/redis/check-customer-record-redis.js laverickclare@hotmail.com
+node scripts/redis/check-customer-record-redis.js --email laverickclare@hotmail.com
+
+# By customer UUID
+node scripts/redis/check-customer-record-redis.js --id bbc62a7c-9f55-5382-b6ad-be4ecb53514e
+```
+
+**Output:** Per-key status (ok / absent / MISSING), rewards count, transactionLog count, and whether all expected keys are present. Exit 0 if required keys present; 1 if record missing or required keys missing.
+
+**Env:** `API_URL` — API base (default `https://api.cannycarrot.com`).
+
+---
+
 ## Quick reference
 
 ```bash
@@ -91,6 +114,12 @@ node scripts/redis/inspect-business-clare-langle-redis.js
 
 # Backup customer record (timestamped file in backups/customers/)
 node scripts/redis/backup-customer-record.js laverickclare@hotmail.com
+
+# Check customer record — all data stored (expected keys present)
+node scripts/redis/check-customer-record-redis.js laverickclare@hotmail.com
+
+# List customer record — everything in Redis (full JSON)
+node scripts/redis/list-customer-record-redis.js laverickclare@hotmail.com
 
 # Full dump (business or customer) — see README-REDIS-DUMP.md
 node scripts/redis/dump-redis-record.js --type customer --id <uuid>
