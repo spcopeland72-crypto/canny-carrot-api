@@ -467,8 +467,8 @@ router.get('/active/customer/:customerId', asyncHandler(async (req: Request, res
     throw new ApiError(404, 'Customer not found');
   }
   
-  // Get all businesses the customer has visited
-  const businessIds = await redisClient.smembers(`customer:${customerId}:businesses`);
+  // Get all businesses the customer has tokens with (token-link index)
+  const businessIds = await redisClient.smembers(REDIS_KEYS.customerBusinesses(customerId));
   
   const activeCampaigns = [];
   

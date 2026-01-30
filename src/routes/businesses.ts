@@ -178,7 +178,138 @@ router.put('/:id', redisWriteMonitor('business'), asyncHandler(async (req: Reque
   res.json(response);
 }));
 
-// GET /api/v1/businesses/:id/customers - Get business's customers
+// GET /api/v1/businesses/:id/tokens - Token-link index: reward + campaign UUIDs for this business
+router.get('/:id/tokens', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const business = await redis.getBusiness(id);
+  if (!business) throw new ApiError(404, 'Business not found');
+  const [rewardIds, campaignIds] = await Promise.all([
+    redisClient.smembers(REDIS_KEYS.businessRewards(id)),
+    redisClient.smembers(REDIS_KEYS.businessCampaigns(id)),
+  ]);
+  const tokenIds = [...new Set([...rewardIds, ...campaignIds])];
+  res.json({ success: true, data: { tokenIds } });
+}));
+
+/** Compute lastScanAt, scansLast30, scansLast90 from transactionLog for a token (reward/campaign) and business */
+function scanAnalytics(
+  transactionLog: { timestamp: string; action: string; data: Record<string, unknown> }[] | undefined,
+  tokenId: string,
+  businessId: string
+): { lastScanAt: string | null; scansLast30: number; scansLast90: number } {
+  const log = Array.isArray(transactionLog) ? transactionLog : [];
+  const now = Date.now();
+  const ms30 = 30 * 24 * 60 * 60 * 1000;
+  const ms90 = 90 * 24 * 60 * 60 * 1000;
+  let lastScanAt: string | null = null;
+  let scansLast30 = 0;
+  let scansLast90 = 0;
+  for (const e of log) {
+    if (e.action !== 'SCAN') continue;
+    const d = e.data || {};
+    const rid = (d.rewardId ?? '').toString();
+    const cid = (d.campaignId ?? '').toString();
+    const bid = (d.businessId ?? '').toString().trim();
+    if (bid !== businessId) continue;
+    const matchesToken = rid === tokenId || cid === tokenId || cid.includes(tokenId) || rid.includes(tokenId);
+    if (!matchesToken) continue;
+    const ts = e.timestamp ? new Date(e.timestamp).getTime() : 0;
+    if (ts && (!lastScanAt || ts > new Date(lastScanAt).getTime())) lastScanAt = e.timestamp;
+    if (ts >= now - ms90) scansLast90++;
+    if (ts >= now - ms30) scansLast30++;
+  }
+  return { lastScanAt, scansLast30, scansLast90 };
+}
+
+// GET /api/v1/businesses/:id/tokens/with-customers - Each token (reward, campaign) with customers and analytics metadata
+router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: Response) => {
+  const businessId = req.params.id;
+  const business = await redis.getBusiness(businessId);
+  if (!business) throw new ApiError(404, 'Business not found');
+  const [rewardIds, campaignIds] = await Promise.all([
+    redisClient.smembers(REDIS_KEYS.businessRewards(businessId)),
+    redisClient.smembers(REDIS_KEYS.businessCampaigns(businessId)),
+  ]);
+  const tokensWithCustomers: Array<{
+    tokenId: string;
+    type: 'reward' | 'campaign';
+    name: string;
+    customers: Array<{
+      customerId: string;
+      customerName: string;
+      pointsEarned: number;
+      pointsRequired: number;
+      lastScanAt: string | null;
+      scansLast30: number;
+      scansLast90: number;
+    }>;
+  }> = [];
+
+  const processToken = async (tokenId: string, type: 'reward' | 'campaign') => {
+    const doc = type === 'reward'
+      ? await redisClient.get(REDIS_KEYS.reward(tokenId))
+      : await redisClient.get(REDIS_KEYS.campaign(tokenId));
+    const name = doc ? (JSON.parse(doc) as { name?: string }).name : tokenId;
+    const customerIds = await redisClient.smembers(REDIS_KEYS.tokenCustomers(tokenId));
+    const customers: typeof tokensWithCustomers[0]['customers'] = [];
+    for (const cid of customerIds) {
+      const customer = await redis.getCustomer(cid);
+      if (!customer) continue;
+      const rewards = Array.isArray(customer.rewards) ? customer.rewards : [];
+      const item = rewards.find((r: { id?: string }) => (r.id ?? '').toString() === tokenId);
+      const pointsEarned = typeof (item as { pointsEarned?: number })?.pointsEarned === 'number' ? (item as { pointsEarned: number }).pointsEarned : (typeof (item as { count?: number })?.count === 'number' ? (item as { count: number }).count : 0);
+      const pointsRequired = typeof (item as { requirement?: number })?.requirement === 'number' ? (item as { requirement: number }).requirement : (typeof (item as { total?: number })?.total === 'number' ? (item as { total: number }).total : 1);
+      const { lastScanAt, scansLast30, scansLast90 } = scanAnalytics(
+        (customer as { transactionLog?: { timestamp: string; action: string; data: Record<string, unknown> }[] }).transactionLog,
+        tokenId,
+        businessId
+      );
+      const customerName = [customer.firstName, customer.lastName].filter(Boolean).join(' ') || (customer.name ?? '') || customer.email || cid;
+      customers.push({ customerId: cid, customerName, pointsEarned, pointsRequired, lastScanAt, scansLast30, scansLast90 });
+    }
+    tokensWithCustomers.push({ tokenId, type, name: (name ?? tokenId).toString(), customers });
+  };
+
+  for (const tokenId of rewardIds) {
+    await processToken(tokenId, 'reward');
+  }
+  for (const tokenId of campaignIds) {
+    await processToken(tokenId, 'campaign');
+  }
+
+  res.json({ success: true, data: { tokens: tokensWithCustomers } });
+}));
+
+// GET /api/v1/businesses/:id/customer-ids - Token-link index: customer UUIDs connected to this business
+router.get('/:id/customer-ids', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const business = await redis.getBusiness(id);
+  if (!business) throw new ApiError(404, 'Business not found');
+  let customerIds = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
+  if (customerIds.length === 0) {
+    let cursor = '0';
+    const collected: string[] = [];
+    do {
+      const [next, keys] = await redisClient.scan(cursor, 'MATCH', 'customer:*', 'COUNT', 200);
+      cursor = next;
+      for (const key of keys) {
+        if (key.startsWith('customer:email:') || key.startsWith('customer:phone:')) continue;
+        const customerId = key.slice('customer:'.length);
+        if (!customerId || customerId.includes(':')) continue;
+        const customer = await redis.getCustomer(customerId);
+        if (!customer || !Array.isArray(customer.rewards)) continue;
+        const hasBusiness = (customer.rewards as { businessId?: string }[]).some(
+          (r) => (r.businessId ?? '').trim() === id
+        );
+        if (hasBusiness) collected.push(customerId);
+      }
+    } while (cursor !== '0');
+    customerIds = [...new Set(collected)];
+  }
+  res.json({ success: true, data: { customerIds } });
+}));
+
+// GET /api/v1/businesses/:id/customers - Get business's customers (full records)
 router.get('/:id/customers', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const page = parseInt(req.query.page as string) || 1;
@@ -190,10 +321,30 @@ router.get('/:id/customers', asyncHandler(async (req: Request, res: Response) =>
     throw new ApiError(404, 'Business not found');
   }
   
-  // Get customer IDs from the set
-  const customerIds = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
+  let customerIds: string[] = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
   
-  // Fetch customer details (with pagination)
+  // Fallback: if set is empty, derive from customer records that have rewards for this business
+  if (customerIds.length === 0) {
+    const collected: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, keys] = await redisClient.scan(cursor, 'MATCH', 'customer:*', 'COUNT', 200);
+      cursor = next;
+      for (const key of keys) {
+        if (key.startsWith('customer:email:') || key.startsWith('customer:phone:')) continue;
+        const customerId = key.slice('customer:'.length);
+        if (!customerId || customerId.includes(':')) continue;
+        const customer = await redis.getCustomer(customerId);
+        if (!customer || !Array.isArray(customer.rewards)) continue;
+        const hasBusiness = (customer.rewards as { businessId?: string }[]).some(
+          (r) => (r.businessId ?? '').trim() === id
+        );
+        if (hasBusiness) collected.push(customerId);
+      }
+    } while (cursor !== '0');
+    customerIds = [...new Set(collected)];
+  }
+  
   const start = (page - 1) * limit;
   const paginatedIds = customerIds.slice(start, start + limit);
   

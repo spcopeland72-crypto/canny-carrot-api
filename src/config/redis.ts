@@ -122,6 +122,10 @@ export const REDIS_KEYS = {
   customerByEmail: (email: string) => `customer:email:${email}`,
   customerByPhone: (phone: string) => `customer:phone:${phone}`,
   customerStamps: (customerId: string, businessId: string) => `customer:${customerId}:stamps:${businessId}`,
+  /** Set of business UUIDs this customer has tokens with. */
+  customerBusinesses: (customerId: string) => `customer:${customerId}:businesses`,
+  /** Set of token UUIDs (reward/campaign/action ids) this customer has. */
+  customerTokens: (customerId: string) => `customer:${customerId}:tokens`,
   businessCustomers: (businessId: string) => `business:${businessId}:customers`,
   
   // Businesses
@@ -154,6 +158,8 @@ export const REDIS_KEYS = {
   // Campaigns
   campaign: (id: string) => `campaign:${id}`,
   businessCampaigns: (businessId: string) => `business:${businessId}:campaigns`,
+  /** Set of customer UUIDs who have this token (reward/campaign id). */
+  tokenCustomers: (tokenId: string) => `token:${tokenId}:customers`,
   
   // Gamification & Leaderboards
   leaderboard: (type: 'stamps' | 'redemptions' | 'points' | 'referrals') => `leaderboard:${type}`,
@@ -202,6 +208,13 @@ export const redis = {
     const n = (email ?? '').toString().toLowerCase().trim();
     if (!n) return;
     await redisClient.set(`customer:email:${n}`, JSON.stringify({ customerId }));
+  },
+
+  /** Remove email → customerId index (e.g. when user changes email; UUID remains truth). */
+  async deleteCustomerEmailIndex(email: string): Promise<void> {
+    const n = (email ?? '').toString().toLowerCase().trim();
+    if (!n) return;
+    await redisClient.del(`customer:email:${n}`);
   },
 
   // Member operations (alias for customer - for backward compatibility)
