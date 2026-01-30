@@ -249,14 +249,6 @@ function scanAnalytics(
   return { lastScanAt, scansLast30, scansLast90, totalScans };
 }
 
-/** Campaign item ids are "campaign-{documentId}-{slug}". Return document id for matching. */
-function campaignDocIdFromItemId(itemId: string): string | null {
-  if (!itemId || !itemId.startsWith('campaign-')) return null;
-  const after = itemId.slice(9);
-  const first = after.split('-')[0];
-  return first || null;
-}
-
 // GET /api/v1/businesses/:id/tokens/with-customers - Each token (reward, campaign) with customers and analytics metadata
 router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: Response) => {
   const businessId = req.params.id;
@@ -293,10 +285,7 @@ router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: 
       const customer = await redis.getCustomer(cid);
       if (!customer) continue;
       const rewards = Array.isArray(customer.rewards) ? customer.rewards : [];
-      const item = rewards.find((r: { id?: string }) => {
-        const rid = (r.id ?? '').toString();
-        return rid === tokenId || campaignDocIdFromItemId(rid) === tokenId;
-      });
+      const item = rewards.find((r: { id?: string }) => (r.id ?? '').toString() === tokenId);
       const pointsEarned = typeof (item as { pointsEarned?: number })?.pointsEarned === 'number' ? (item as { pointsEarned: number }).pointsEarned : (typeof (item as { count?: number })?.count === 'number' ? (item as { count: number }).count : 0);
       const pointsRequired = typeof (item as { requirement?: number })?.requirement === 'number' ? (item as { requirement: number }).requirement : (typeof (item as { total?: number })?.total === 'number' ? (item as { total: number }).total : 1);
       const { lastScanAt, scansLast30, scansLast90, totalScans } = scanAnalytics(

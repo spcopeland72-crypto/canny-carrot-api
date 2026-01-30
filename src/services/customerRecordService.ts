@@ -15,19 +15,10 @@ import type { CustomerRecord } from '../types/customerRecord';
 
 type RewardItem = { id?: string; businessId?: string; businessName?: string };
 
-/** Campaign item ids are "campaign-{documentId}-{slug}". Return document id so tokens/with-customers can find customers. */
-function campaignDocIdFromItemId(itemId: string): string | null {
-  if (!itemId || !itemId.startsWith('campaign-')) return null;
-  const after = itemId.slice(9);
-  const first = after.split('-')[0];
-  return first || null;
-}
-
-/** Token-link index: token id = document id for both rewards and campaigns. No prefix. */
-function getBusinessIdsAndTokenIds(rewards: RewardItem[]): { businessIds: Set<string>; tokenIds: Set<string>; campaignDocIds: Set<string> } {
+/** Token-link index: token id = document id for both rewards and campaigns. Same format everywhere. */
+function getBusinessIdsAndTokenIds(rewards: RewardItem[]): { businessIds: Set<string>; tokenIds: Set<string> } {
   const businessIds = new Set<string>();
   const tokenIds = new Set<string>();
-  const campaignDocIds = new Set<string>();
   for (const r of rewards) {
     const tid = (r.id ?? '').toString().trim();
     const rawBid = (r.businessId ?? '').toString().trim();
@@ -35,10 +26,8 @@ function getBusinessIdsAndTokenIds(rewards: RewardItem[]): { businessIds: Set<st
     const bid = rawBName && rawBName.startsWith('business_') ? rawBName : rawBid;
     if (bid) businessIds.add(bid);
     if (tid) tokenIds.add(tid);
-    const cDocId = campaignDocIdFromItemId(tid);
-    if (cDocId) campaignDocIds.add(cDocId);
   }
-  return { businessIds, tokenIds, campaignDocIds };
+  return { businessIds, tokenIds };
 }
 
 export const customerRecordService = {
@@ -74,8 +63,8 @@ export const customerRecordService = {
     const email = (record.email ?? '').toString().toLowerCase().trim();
     if (email) await redis.setCustomerEmailIndex(email, id);
 
-    const { businessIds: oldBids, tokenIds: oldTids, campaignDocIds: oldCampaignDocIds } = getBusinessIdsAndTokenIds(oldRewards);
-    const { businessIds: newBids, tokenIds: newTids, campaignDocIds: newCampaignDocIds } = getBusinessIdsAndTokenIds(newRewards);
+    const { businessIds: oldBids, tokenIds: oldTids } = getBusinessIdsAndTokenIds(oldRewards);
+    const { businessIds: newBids, tokenIds: newTids } = getBusinessIdsAndTokenIds(newRewards);
 
     for (const bid of oldBids) {
       await redisClient.srem(REDIS_KEYS.businessCustomers(bid), id);
@@ -88,13 +77,6 @@ export const customerRecordService = {
     }
     for (const tid of newTids) {
       await redisClient.sadd(REDIS_KEYS.tokenCustomers(tid), id);
-    }
-    // tokens/with-customers uses campaign document id (not campaign-item id); keep token:{campaignDocId}:customers in sync
-    for (const cDocId of oldCampaignDocIds) {
-      await redisClient.srem(REDIS_KEYS.tokenCustomers(cDocId), id);
-    }
-    for (const cDocId of newCampaignDocIds) {
-      await redisClient.sadd(REDIS_KEYS.tokenCustomers(cDocId), id);
     }
 
     await redisClient.del(REDIS_KEYS.customerBusinesses(id));
