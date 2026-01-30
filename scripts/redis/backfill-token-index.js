@@ -36,15 +36,16 @@ if (!process.env.REDIS_URL || !process.env.REDIS_URL.trim()) {
 
 const { connectRedis, redisClient, REDIS_KEYS } = require('../../dist/config/redis');
 
+/** Token-link index uses raw campaign UUID. Mobile app syncs campaign id as "campaign-{uuid}". */
 function getBusinessIdsAndTokenIds(rewards) {
   const businessIds = new Set();
   const tokenIds = new Set();
   if (!Array.isArray(rewards)) return { businessIds, tokenIds };
   for (const r of rewards) {
     const bid = (r.businessId ?? '').toString().trim();
-    const tid = (r.id ?? '').toString().trim();
+    const rawId = (r.id ?? '').toString().trim();
     if (bid) businessIds.add(bid);
-    if (tid) tokenIds.add(tid);
+    if (rawId) tokenIds.add(rawId.startsWith('campaign-') ? rawId.replace(/^campaign-/, '') : rawId);
   }
   return { businessIds, tokenIds };
 }

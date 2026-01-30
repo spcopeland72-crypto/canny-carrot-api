@@ -15,14 +15,15 @@ import type { CustomerRecord } from '../types/customerRecord';
 
 type RewardItem = { id?: string; businessId?: string };
 
+/** Token-link index uses raw campaign UUID (token:{id}:customers). Mobile app syncs campaign id as "campaign-{uuid}". */
 function getBusinessIdsAndTokenIds(rewards: RewardItem[]): { businessIds: Set<string>; tokenIds: Set<string> } {
   const businessIds = new Set<string>();
   const tokenIds = new Set<string>();
   for (const r of rewards) {
     const bid = (r.businessId ?? '').toString().trim();
-    const tid = (r.id ?? '').toString().trim();
+    const rawId = (r.id ?? '').toString().trim();
     if (bid) businessIds.add(bid);
-    if (tid) tokenIds.add(tid);
+    if (rawId) tokenIds.add(rawId.startsWith('campaign-') ? rawId.replace(/^campaign-/, '') : rawId);
   }
   return { businessIds, tokenIds };
 }

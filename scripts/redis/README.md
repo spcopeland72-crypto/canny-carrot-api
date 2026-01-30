@@ -21,6 +21,7 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 | **read-business-redis-data.js** | Read business Redis data by business name (direct Redis; build; uses REDIS_URL from .env). | `node scripts/redis/read-business-redis-data.js "The Stables"` |
 | **show-index.js** | Dump token-link index (business/token/customer sets). API-based; no build or REDIS_URL. | See [Token-link index](#token-link-index-show-indexjs) below. |
 | **backfill-token-index.js** | Populate token-link index from legacy customer records (one-time backfill). Direct Redis; build; uses REDIS_URL from .env. | See [Backfill token index](#backfill-token-index-backfill-token-indexjs) below. |
+| **check-manage-customers-api.js** | Check what Manage Customers API returns (reward vs campaign token counts, customer counts per token). API-based; no build. | `BUSINESS_ID=<uuid> node scripts/redis/check-manage-customers-api.js` |
 
 ---
 
@@ -41,6 +42,21 @@ node scripts/redis/backfill-token-index.js
 **Output:** Progress, then summary (customers processed, with rewards, SADD counts). No changes to customer record bodies; only index sets are written.
 
 **See also:** [CODEX/TOKEN_LINK_INDEXES.md](../../CODEX/TOKEN_LINK_INDEXES.md).
+
+---
+
+## Manage Customers API check: `check-manage-customers-api.js`
+
+**Purpose:** See what the Manage Customers endpoint returns (rewards vs campaigns, customer counts). Use when rewards show but campaigns don’t.
+
+**Usage:**
+
+```bash
+cd canny-carrot-api
+BUSINESS_ID=<your-business-uuid> node scripts/redis/check-manage-customers-api.js
+```
+
+Use the same `BUSINESS_ID` you use to log into the business app (or get it from `show-index.js` via `business:*:customers` keys). If **Campaign tokens: 0**, the business has no campaigns in Redis (`business:*:campaigns`). If campaign tokens exist but each has **0 customers**, re-run `backfill-token-index.js` and **redeploy the API** so the campaign index and item lookup fixes are live.
 
 ---
 
