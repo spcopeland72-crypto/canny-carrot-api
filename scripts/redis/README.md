@@ -15,13 +15,13 @@ All scripts that **read or inspect Redis** (customer app data, business data, or
 | Script | Purpose | Usage |
 |--------|---------|--------|
 | **inspect-customer-redis.js** | Read customer record by email (account + embedded rewards; summary). | See [Customer data reading](#customer-data-reading-inspect-customer-redisjs) below. |
-| **list-customer-record-redis.js** | Full customer record via API (account, rewards, campaigns, transactionLog). By email or `--id <uuid>`. | See [List customer record](#list-customer-record-list-customer-record-redisjs) below. |
-| **read-business-record-api.js** | Full business record via API (profile + rewards + campaigns). No Redis or build. | `node scripts/redis/read-business-record-api.js <businessId>` |
+| **list-customer-record-redis.js** | **Formatted:** Customer record — Field/Value + Rewards table + Campaigns list. By email or `--id <uuid>`. | See [List customer record](#list-customer-record-list-customer-record-redisjs) below. |
+| **read-business-record-api.js** | **Formatted:** Business record — Profile + Rewards table + Campaigns table. API; no build. | `node scripts/redis/read-business-record-api.js <businessId>` |
 | **inspect-business-clare-langle-redis.js** | Inspect Redis for business “Clare’s Cakes” (name match). | `node scripts/redis/inspect-business-clare-langle-redis.js` |
 | **dump-redis-record.js** | Dump full business or customer record (profile, rewards, campaigns, etc.) to console or file. | See `README-REDIS-DUMP.md` in this folder. |
 | **backup-customer-record.js** | Backup customer record to a timestamped file (run before risky operations; restorable). | See [Backup customer record](#backup-customer-record-backup-customer-recordjs) below. |
 | **read-business-redis-data.js** | Read business Redis data by business name (direct Redis; build; uses REDIS_URL from .env). | `node scripts/redis/read-business-redis-data.js "The Stables"` |
-| **show-index.js** | Dump token-link index (business/token/customer sets). API-based; no build or REDIS_URL. | See [Token-link index](#token-link-index-show-indexjs) below. |
+| **show-index.js** | **Formatted:** Token-link index — Key \| Members table. API; no build. | See [Token-link index](#token-link-index-show-indexjs) below. |
 | **backfill-token-index.js** | Populate token-link index from legacy customer records (one-time backfill). Direct Redis; build; uses REDIS_URL from .env. | See [Backfill token index](#backfill-token-index-backfill-token-indexjs) below. |
 | **check-manage-customers-api.js** | Check what Manage Customers API returns (reward vs campaign token counts, customer counts per token). API-based; no build. | `BUSINESS_ID=<uuid> node scripts/redis/check-manage-customers-api.js` |
 
@@ -87,9 +87,21 @@ node scripts/redis/show-index.js
 
 - `API_URL` — API base URL (default `https://api.cannycarrot.com`).
 
-**Output:** Each index key and its SET members (up to 20 shown per key; count for all). `(no index keys found)` if the index is empty.
+**Output:** **Formatted** — Token-link index as a Key \| Members table. Each row: key, then members as `[count] id1, id2, ...` (up to 50 per key). `(no index keys found)` if empty. Not JSON.
 
 **See also:** [CODEX/TOKEN_LINK_INDEXES.md](../../CODEX/TOKEN_LINK_INDEXES.md), [CODEX/TOOLS_MANIFEST.md](../../CODEX/TOOLS_MANIFEST.md).
+
+---
+
+## Output format (formatted scripts)
+
+These three scripts print **human-readable formatted output** (not raw JSON). Use them when you need "business record, customer record, and index" in a readable form. See [CODEX/TOOLS_MANIFEST.md](../../CODEX/TOOLS_MANIFEST.md) for the manifest and quick commands.
+
+| Script | Output format |
+|--------|----------------|
+| **read-business-record-api.js** | Header: "Here's what the API returned for {name} (business {id})". Then **Business record** → **Profile** (id, name, email, phone, updatedAt, products, actions) → **Rewards (N)** table: id, name, type, stamps, selectedProducts → **Campaigns (N)** table: id, name, type, selectedProducts, selectedActions. |
+| **list-customer-record-redis.js** | Header: "Here's the customer view after refresh, login, scanning campaigns, and sync." Then **Customer account (Name)** → **Field** \| **Value** table (id, email, firstName, lastName, phone, createdAt, updatedAt, totalStamps, totalRedemptions) → **Rewards (N rewards)** table: id, name, pointsEarned/requirement, type → **Campaigns (N in rewards[])** list: for each campaign, name (id: …), Progress x/y, Products, Actions, Collected so far. |
+| **show-index.js** | **Token-link index** → **Key** \| **Members** table. Each row: index key, then members as `[count] member1, member2, ...`. Keys: business:*:customers, token:*:customers, customer:*:businesses, customer:*:tokens. |
 
 ---
 
@@ -176,7 +188,7 @@ node scripts/redis/check-customer-record-redis.js --id bbc62a7c-9f55-5382-b6ad-b
 
 ## List customer record: `list-customer-record-redis.js`
 
-**Purpose:** Fetch the full customer record from the API (Redis-backed) and print it as JSON. Use after customer app login/sync to see account, `rewards[]` (rewards and campaigns), and `transactionLog`. API-based; no build or REDIS_URL.
+**Purpose:** Fetch the full customer record from the API (Redis-backed) and print it in **formatted** human-readable form (not JSON). Use after customer app login/sync to see account, rewards table, and campaigns list. API-based; no build or REDIS_URL.
 
 **Usage:**
 
@@ -191,7 +203,7 @@ node scripts/redis/list-customer-record-redis.js --email <email>
 node scripts/redis/list-customer-record-redis.js --id bbc62a7c-9f55-5382-b6ad-be4ecb53514e
 ```
 
-**Output:** Full JSON (id, email, firstName, lastName, rewards[], transactionLog, etc.).
+**Output:** **Formatted** — Header; Customer account (Name) with Field \| Value table; Rewards (N rewards) table; Campaigns (N in rewards[]) with name, id, Progress, Products, Actions, Collected so far. See [Output format (formatted scripts)](#output-format-formatted-scripts) above.
 
 **Env:** `API_URL` — API base (default `https://api.cannycarrot.com`).
 
@@ -232,20 +244,20 @@ node scripts/redis/backup-customer-record.js laverickclare@hotmail.com
 # Check customer record — all data stored (expected keys present)
 node scripts/redis/check-customer-record-redis.js laverickclare@hotmail.com
 
-# List customer record — everything in Redis (full JSON)
+# List customer record — formatted (Field/Value + Rewards + Campaigns)
 node scripts/redis/list-customer-record-redis.js laverickclare@hotmail.com
 
 # Full dump (business or customer) — see README-REDIS-DUMP.md
 node scripts/redis/dump-redis-record.js --type customer --id <uuid>
 node scripts/redis/dump-redis-record.js --type business --email business@example.com
 
-# Business record via API (profile + rewards + campaigns; no build)
+# Business record — formatted (Profile + Rewards table + Campaigns table)
 node scripts/redis/read-business-record-api.js <businessId>
 
 # Business by name (direct Redis)
 node scripts/redis/read-business-redis-data.js "The Stables"
 
-# Token-link index (API; no build)
+# Token-link index — formatted Key | Members table
 node scripts/redis/show-index.js
 
 # Backfill token-link index from legacy customer records (direct Redis)

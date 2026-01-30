@@ -33,8 +33,42 @@ async function main() {
   const campaignsData = campaignsRes.ok ? await campaignsRes.json() : { data: [] };
   const rewards = Array.isArray(rewardsData.data) ? rewardsData.data : [];
   const campaigns = Array.isArray(campaignsData.data) ? campaignsData.data : [];
-  const record = { ...profile, rewards, campaigns };
-  console.log(JSON.stringify(record, null, 2));
+  const name = profile.name || profile.id || idOrSlug;
+  console.log(`Here's what the API returned for ${name} (business ${profile.id || idOrSlug}):\n`);
+  console.log('Business record (profile + rewards + campaigns)\n');
+  console.log('Profile');
+  console.log('id:', profile.id);
+  console.log('name:', profile.name);
+  console.log('email:', profile.email ?? '');
+  console.log('phone:', profile.phone ?? '');
+  console.log('updatedAt:', profile.updatedAt ?? '');
+  const products = Array.isArray(profile.products) ? profile.products : [];
+  console.log('products:', products.length ? products.join(', ') : '(none)');
+  const actions = Array.isArray(profile.actions) ? profile.actions : [];
+  console.log('actions:', actions.length ? actions.join(', ') : '[] (empty)');
+  console.log('');
+  console.log(`Rewards (${rewards.length})`);
+  if (rewards.length) {
+    console.log('id\tname\ttype\tstamps\tselectedProducts');
+    for (const r of rewards) {
+      const prods = Array.isArray(r.selectedProducts) ? r.selectedProducts.join(', ') : '';
+      console.log(`${r.id}\t${r.name || ''}\t${r.type || ''}\t${r.stampsRequired ?? r.costStamps ?? ''}\t${prods}`);
+    }
+  } else {
+    console.log('(none)');
+  }
+  console.log('');
+  console.log(`Campaigns (${campaigns.length})`);
+  if (campaigns.length) {
+    console.log('id\tname\ttype\tselectedProducts\tselectedActions');
+    for (const c of campaigns) {
+      const prods = Array.isArray(c.selectedProducts) ? c.selectedProducts.join(', ') : '';
+      const acts = Array.isArray(c.selectedActions) ? c.selectedActions.join(', ') : '';
+      console.log(`${c.id}\t${c.name || ''}\t${c.type || ''}\t${prods}\t${acts}`);
+    }
+  } else {
+    console.log('(none)');
+  }
 }
 
 main().catch((err) => {

@@ -42,12 +42,13 @@ async function main() {
     return;
   }
   const keys = Object.keys(data).sort();
-  console.log('=== Token-link index contents ===\n');
+  console.log('Token-link index\n');
+  console.log('Key\tMembers');
   for (const key of keys) {
     const members = data[key];
     const list = Array.isArray(members) ? members : [];
-    console.log(key);
-    console.log(`  => [${list.length}] ${list.slice(0, 20).join(', ')}${list.length > 20 ? '...' : ''}`);
+    const memberStr = list.length ? `[${list.length}] ${list.slice(0, 50).join(', ')}${list.length > 50 ? '...' : ''}` : '[]';
+    console.log(`${key}\t${memberStr}`);
   }
   if (keys.length === 0) {
     console.log('(no index keys found)');
