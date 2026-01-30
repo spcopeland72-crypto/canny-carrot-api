@@ -27,7 +27,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     })
   );
   
-  let filteredCampaigns = campaigns.filter(c => c !== null);
+  let filteredCampaigns = campaigns.filter(c => c !== null && !(c as { deletedAt?: string }).deletedAt);
   
   if (status) {
     filteredCampaigns = filteredCampaigns.filter(c => c.status === status);
@@ -146,7 +146,13 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
       createdAt: req.body.createdAt || existingCampaign.createdAt || now, // Preserve or use provided
       updatedAt: req.body.updatedAt || now, // Use provided or current time
     };
-    
+    delete campaign.deletedAt; // undelete when saving (historic data may have been soft-deleted)
+
+    // Ensure campaign is in active list (undelete or normal update)
+    const bid = campaign.businessId as string;
+    if (bid) await redisClient.sadd(`business:${bid}:campaigns`, campaignId);
+    console.log(`[SYNC] Campaign committed (UPDATE): id=${campaignId} businessId=${bid} → added to business:${bid}:campaigns`);
+
     // 🔍 LOG: What we're about to save to Redis (UPDATE path)
     console.log(`💾 [CAMPAIGNS API] Saving campaign "${campaign.name}" (ID: ${campaignId}) to Redis:`, {
       hasSelectedProducts: !!campaign.selectedProducts,
@@ -273,6 +279,7 @@ router.post('/', redisWriteMonitor('campaign'), asyncHandler(async (req: Request
     
     // Add to business's campaign set
     await redisClient.sadd(`business:${businessId}:campaigns`, campaignId);
+    console.log(`[SYNC] Campaign committed (CREATE): id=${campaignId} businessId=${businessId} → added to business:${businessId}:campaigns`);
   
     // API is a transparent forwarder - does not modify business stats or timestamps
     // App is responsible for updating business profile and stats when syncing
@@ -320,9 +327,14 @@ router.put('/:id', redisWriteMonitor('campaign'), asyncHandler(async (req: Reque
     ...updates,
     updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : campaign.updatedAt, // Preserve from request or existing
   };
-  
+  delete (updatedCampaign as Record<string, unknown>).deletedAt; // undelete when saving
+
   await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(updatedCampaign));
-  
+
+  // Ensure campaign is in active list (undelete or normal update)
+  const bid = (updatedCampaign.businessId ?? campaign.businessId) as string;
+  if (bid) await redisClient.sadd(`business:${bid}:campaigns`, id);
+
   // Capture what was saved to Redis for debugging
   captureClientUpload('campaign', campaign.businessId, updatedCampaign).catch(err => 
     console.error('[DEBUG] Error capturing saved campaign:', err)
@@ -374,32 +386,31 @@ router.put('/:id/status', asyncHandler(async (req: Request, res: Response) => {
   });
 }));
 
-// DELETE /api/v1/campaigns/:id
+// DELETE /api/v1/campaigns/:id — soft delete: remove from active list, keep doc and token index for admin/history/undelete
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  
+
   const data = await redisClient.get(REDIS_KEYS.campaign(id));
   if (!data) {
     throw new ApiError(404, 'Campaign not found');
   }
-  
+
   const campaign = JSON.parse(data);
-  
-  // Remove from business's campaign list
+  const now = new Date().toISOString();
+
+  // Remove from business's active campaign list (no longer returned by GET /campaigns or tokens/with-customers)
   await redisClient.srem(`business:${campaign.businessId}:campaigns`, id);
-  
+
   // Remove from scheduled queue if present
   await redisClient.zrem('campaigns:scheduled', id);
-  
-  // Delete campaign data
-  await redisClient.del(REDIS_KEYS.campaign(id));
-  await redisClient.del(`campaign:${id}:impressions`);
-  await redisClient.del(`campaign:${id}:clicks`);
-  await redisClient.del(`campaign:${id}:conversions`);
-  
+
+  // Soft delete: set deletedAt, keep document and token index (historic data, Canny Carrot admin, undelete)
+  const updated = { ...campaign, deletedAt: now };
+  await redisClient.set(REDIS_KEYS.campaign(id), JSON.stringify(updated));
+
   res.json({
     success: true,
-    message: 'Campaign deleted',
+    message: 'Campaign deleted (soft). Document and customer links retained for admin and undelete.',
   });
 }));
 

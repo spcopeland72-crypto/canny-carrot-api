@@ -77,18 +77,19 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(response);
 }));
 
-// GET /api/v1/businesses/:id - Get a specific business
+// GET /api/v1/businesses/:id - Get a specific business (profile + rewards + campaigns)
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   
   // Try by ID first, then by slug
   let business = await redis.getBusiness(id);
+  let businessId = id;
   
   if (!business) {
-    // Try looking up by slug
-    const businessId = await redisClient.get(REDIS_KEYS.businessBySlug(id));
-    if (businessId) {
-      business = await redis.getBusiness(businessId);
+    const slugId = await redisClient.get(REDIS_KEYS.businessBySlug(id));
+    if (slugId) {
+      business = await redis.getBusiness(slugId);
+      businessId = slugId;
     }
   }
   
@@ -96,17 +97,39 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     throw new ApiError(404, 'Business not found');
   }
   
-  // Capture server download for debugging
-  captureServerDownload('business', id, business).catch(err => 
+  // Load rewards and campaigns (part of business record)
+  const [rewardIds, campaignIds] = await Promise.all([
+    redisClient.smembers(REDIS_KEYS.businessRewards(businessId)),
+    redisClient.smembers(REDIS_KEYS.businessCampaigns(businessId)),
+  ]);
+  const rewards = await Promise.all(
+    rewardIds.map(async (rid) => {
+      const raw = await redisClient.get(REDIS_KEYS.reward(rid));
+      return raw ? JSON.parse(raw) : null;
+    })
+  );
+  const campaigns = await Promise.all(
+    campaignIds.map(async (cid) => {
+      const raw = await redisClient.get(REDIS_KEYS.campaign(cid));
+      return raw ? JSON.parse(raw) : null;
+    })
+  );
+  
+  const data = {
+    ...business,
+    id: businessId,
+    rewards: rewards.filter(Boolean),
+    campaigns: campaigns.filter(Boolean),
+  };
+  
+  // Sync/timestamp: GET business returns this updatedAt for client timestamp comparison
+  console.log(`[SYNC] GET business ${businessId} → updatedAt: ${(business as { updatedAt?: string }).updatedAt ?? 'null'}, campaigns in set: ${campaignIds.length}`);
+  
+  captureServerDownload('business', id, data).catch(err =>
     console.error('[DEBUG] Error capturing server download:', err)
   );
   
-  const response: ApiResponse<Business> = {
-    success: true,
-    data: business,
-  };
-  
-  res.json(response);
+  res.json({ success: true, data });
 }));
 
 // PUT /api/v1/businesses/:id - Update a business
@@ -157,6 +180,9 @@ router.put('/:id', redisWriteMonitor('business'), asyncHandler(async (req: Reque
     id, // Ensure ID can't be changed
     updatedAt: updates.updatedAt !== undefined ? updates.updatedAt : existing.updatedAt, // Preserve timestamp if not provided
   };
+  
+  // Sync/timestamp: log what client sent and what we store
+  console.log(`[SYNC] PUT business ${id} → client updatedAt: ${(updates as { updatedAt?: string }).updatedAt ?? 'undefined'}, stored updatedAt: ${(updated as { updatedAt?: string }).updatedAt ?? 'null'}`);
   
   await redis.setBusiness(id, updated);
   
@@ -281,89 +307,6 @@ router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: 
   }
 
   res.json({ success: true, data: { tokens: tokensWithCustomers } });
-}));
-
-// GET /api/v1/businesses/:id/customer-ids - Token-link index: customer UUIDs connected to this business
-router.get('/:id/customer-ids', asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const business = await redis.getBusiness(id);
-  if (!business) throw new ApiError(404, 'Business not found');
-  let customerIds = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
-  if (customerIds.length === 0) {
-    let cursor = '0';
-    const collected: string[] = [];
-    do {
-      const [next, keys] = await redisClient.scan(cursor, 'MATCH', 'customer:*', 'COUNT', 200);
-      cursor = next;
-      for (const key of keys) {
-        if (key.startsWith('customer:email:') || key.startsWith('customer:phone:')) continue;
-        const customerId = key.slice('customer:'.length);
-        if (!customerId || customerId.includes(':')) continue;
-        const customer = await redis.getCustomer(customerId);
-        if (!customer || !Array.isArray(customer.rewards)) continue;
-        const hasBusiness = (customer.rewards as { businessId?: string }[]).some(
-          (r) => (r.businessId ?? '').trim() === id
-        );
-        if (hasBusiness) collected.push(customerId);
-      }
-    } while (cursor !== '0');
-    customerIds = [...new Set(collected)];
-  }
-  res.json({ success: true, data: { customerIds } });
-}));
-
-// GET /api/v1/businesses/:id/customers - Get business's customers (full records)
-router.get('/:id/customers', asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 20;
-  
-  const business = await redis.getBusiness(id);
-  
-  if (!business) {
-    throw new ApiError(404, 'Business not found');
-  }
-  
-  let customerIds: string[] = await redisClient.smembers(REDIS_KEYS.businessCustomers(id));
-  
-  // Fallback: if set is empty, derive from customer records that have rewards for this business
-  if (customerIds.length === 0) {
-    const collected: string[] = [];
-    let cursor = '0';
-    do {
-      const [next, keys] = await redisClient.scan(cursor, 'MATCH', 'customer:*', 'COUNT', 200);
-      cursor = next;
-      for (const key of keys) {
-        if (key.startsWith('customer:email:') || key.startsWith('customer:phone:')) continue;
-        const customerId = key.slice('customer:'.length);
-        if (!customerId || customerId.includes(':')) continue;
-        const customer = await redis.getCustomer(customerId);
-        if (!customer || !Array.isArray(customer.rewards)) continue;
-        const hasBusiness = (customer.rewards as { businessId?: string }[]).some(
-          (r) => (r.businessId ?? '').trim() === id
-        );
-        if (hasBusiness) collected.push(customerId);
-      }
-    } while (cursor !== '0');
-    customerIds = [...new Set(collected)];
-  }
-  
-  const start = (page - 1) * limit;
-  const paginatedIds = customerIds.slice(start, start + limit);
-  
-  const customers = await Promise.all(
-    paginatedIds.map(async (customerId) => {
-      const customer = await redis.getCustomer(customerId);
-      const stampCount = await redis.getStampCount(customerId, id);
-      return { ...customer, stampCount };
-    })
-  );
-  
-  res.json({
-    success: true,
-    data: customers.filter(Boolean),
-    meta: { page, limit, total: customerIds.length },
-  });
 }));
 
 // GET /api/v1/businesses/:id/stats - Get business statistics
