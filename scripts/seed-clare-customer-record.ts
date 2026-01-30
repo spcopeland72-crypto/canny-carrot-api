@@ -92,7 +92,8 @@ function mapRewardToItem(r: RepoReward, businessName: string): CustomerRecordRew
 
 function mapCampaignToItem(c: RepoCampaign, businessName: string): CustomerRecordRewardItem {
   return {
-    id: `campaign-${c.id}`,
+    id: c.id,
+    tokenKind: 'campaign',
     name: c.name,
     count: 0,
     total: 1,

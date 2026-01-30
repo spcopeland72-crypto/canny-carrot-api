@@ -50,7 +50,7 @@ async function main() {
   console.log('Campaign tokens:', campaigns.length);
   campaigns.forEach((t) => console.log('  -', t.name, '| customers:', (t.customers || []).length));
   console.log('\nIf campaign tokens are 0: business has no campaigns in Redis (business:*:campaigns).');
-  console.log('If campaign tokens exist but each has 0 customers: run backfill-token-index.js (with campaign- strip) and redeploy API.');
+  console.log('If campaign tokens exist but each has 0 customers: run backfill-token-index.js and redeploy API (rewards and campaigns use same id format).');
 }
 
 main().catch((err) => {

@@ -116,9 +116,9 @@ router.get('/:id/summary', asyncHandler(async (req: Request, res: Response) => {
     const b = await redis.getBusiness(bid);
     businessNames[bid] = (b as { name?: string; profile?: { name?: string } })?.name ?? (b as { profile?: { name?: string } })?.profile?.name ?? bid;
   }
-  const tokens = rewards.map((r: { id?: string; name?: string; businessId?: string; pointsEarned?: number; count?: number; requirement?: number; total?: number }) => {
+  const tokens = rewards.map((r: { id?: string; name?: string; businessId?: string; pointsEarned?: number; count?: number; requirement?: number; total?: number; tokenKind?: string }) => {
     const tokenId = (r.id ?? '').toString();
-    const type = tokenId.startsWith('campaign-') ? 'campaign' : 'reward';
+    const type = r.tokenKind === 'campaign' ? 'campaign' : 'reward';
     const pointsEarned = typeof r.pointsEarned === 'number' ? r.pointsEarned : (typeof r.count === 'number' ? r.count : 0);
     const pointsRequired = typeof r.requirement === 'number' ? r.requirement : (typeof r.total === 'number' ? r.total : 1);
     const businessId = (r.businessId ?? '').trim();

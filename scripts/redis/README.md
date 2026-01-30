@@ -56,7 +56,7 @@ cd canny-carrot-api
 BUSINESS_ID=<your-business-uuid> node scripts/redis/check-manage-customers-api.js
 ```
 
-Use the same `BUSINESS_ID` you use to log into the business app (or get it from `show-index.js` via `business:*:customers` keys). If **Campaign tokens: 0**, the business has no campaigns in Redis (`business:*:campaigns`). If campaign tokens exist but each has **0 customers**, re-run `backfill-token-index.js` and **redeploy the API** so the campaign index and item lookup fixes are live.
+Use the same `BUSINESS_ID` you use to log into the business app (or get it from `show-index.js` via `business:*:customers` keys). If **Campaign tokens: 0**, the business has no campaigns in Redis (`business:*:campaigns`). If campaign tokens exist but each has **0 customers**, re-run `backfill-token-index.js` and **redeploy the API**. Rewards and campaigns use the same id format (document id, no prefix); re-sync from the customer app or re-seed so the index uses token:{id}:customers for both.
 
 ---
 

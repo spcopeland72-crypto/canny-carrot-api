@@ -36,6 +36,8 @@ export interface CustomerRecordRewardItem {
   lastScannedAt?: string;
   isEarned?: boolean;
   type?: 'product' | 'action';
+  /** Token kind: reward vs campaign. Same id format (document id) for both. */
+  tokenKind?: 'reward' | 'campaign';
   startDate?: string;
   endDate?: string;
 }

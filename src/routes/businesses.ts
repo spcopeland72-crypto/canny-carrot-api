@@ -259,10 +259,7 @@ router.get('/:id/tokens/with-customers', asyncHandler(async (req: Request, res: 
       const customer = await redis.getCustomer(cid);
       if (!customer) continue;
       const rewards = Array.isArray(customer.rewards) ? customer.rewards : [];
-      const item = rewards.find((r: { id?: string }) => {
-        const id = (r.id ?? '').toString();
-        return id === tokenId || id === `campaign-${tokenId}`;
-      });
+      const item = rewards.find((r: { id?: string }) => (r.id ?? '').toString() === tokenId);
       const pointsEarned = typeof (item as { pointsEarned?: number })?.pointsEarned === 'number' ? (item as { pointsEarned: number }).pointsEarned : (typeof (item as { count?: number })?.count === 'number' ? (item as { count: number }).count : 0);
       const pointsRequired = typeof (item as { requirement?: number })?.requirement === 'number' ? (item as { requirement: number }).requirement : (typeof (item as { total?: number })?.total === 'number' ? (item as { total: number }).total : 1);
       const { lastScanAt, scansLast30, scansLast90, totalScans } = scanAnalytics(
